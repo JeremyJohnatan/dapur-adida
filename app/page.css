@@ -1,0 +1,78 @@
+/* Page.css */
+
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+.page-container {
+  background-color: #f4f4f4;
+}
+
+.hero-section {
+  background-color: #ff6347;
+  color: white;
+  padding: 80px 0;
+}
+
+.hero-section h1 {
+  font-size: 50px;
+  font-weight: bold;
+}
+
+.hero-buttons a {
+  margin: 10px;
+}
+
+.about-section {
+  background-color: #fff;
+  padding: 50px 0;
+}
+
+.menu-section {
+  background-color: #f8f9fa;
+  padding: 50px 0;
+}
+
+.menu-item {
+  padding: 20px;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.menu-item img {
+  max-width: 100%;
+  border-radius: 8px;
+}
+
+.menu-item h4 {
+  font-size: 20px;
+  margin-top: 15px;
+}
+
+.menu-item p {
+  font-size: 16px;
+}
+
+.contact-section {
+  background-color: #fff;
+  padding: 50px 0;
+}
+
+footer {
+  background-color: #333;
+  color: white;
+  padding: 20px 0;
+}
+
+footer a {
+  color: white;
+  text-decoration: none;
+  margin: 0 15px;
+}
+
+footer a:hover {
+  text-decoration: underline;
+}
