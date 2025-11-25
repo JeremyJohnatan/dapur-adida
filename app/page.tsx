@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image"; // Import Image untuk logo
+import Image from "next/image";
 import { useSession, signOut } from "next-auth/react";
+import { useState, useEffect } from "react"; 
+import { useCart } from "@/context/CartContext"; 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,73 +16,127 @@ import {
   Star,
   LogOut,
   User,
-  ChefHat // Masih dipakai untuk placeholder menu kosong
+  ShoppingCart, 
+  ChefHat,
+  Loader2 
 } from "lucide-react";
+
+// Tipe data Menu
+interface Menu {
+  id: string;
+  name: string;
+  description: string | null;
+  price: string | number;
+  imageUrl: string | null;
+  isAvailable: boolean;
+}
 
 export default function LandingPage() {
   const { data: session, status } = useSession();
+  
+  // Kita hanya butuh totalItems untuk badge keranjang di navbar
+  const { totalItems } = useCart();
+  
+  const [featuredMenus, setFeaturedMenus] = useState<Menu[]>([]);
+  const [loadingMenu, setLoadingMenu] = useState(true);
+
+  useEffect(() => {
+    const fetchFeaturedMenus = async () => {
+      try {
+        const res = await fetch("/api/menus");
+        const data = await res.json();
+        setFeaturedMenus(data.slice(0, 3)); 
+      } catch (error) {
+        console.error("Gagal ambil menu", error);
+      } finally {
+        setLoadingMenu(false);
+      }
+    };
+
+    fetchFeaturedMenus();
+  }, []);
+
+  const formatRupiah = (price: string | number) => {
+    return new Intl.NumberFormat("id-ID", {
+      style: "currency",
+      currency: "IDR",
+      minimumFractionDigits: 0,
+    }).format(Number(price));
+  };
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
       
       {/* ===== 1. NAVBAR ===== */}
       <nav className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur-md shadow-sm transition-all">
-        <div className="container mx-auto px-4 h-20 flex items-center justify-between">
+        <div className="container mx-auto px-4 h-20 flex items-center justify-between relative">
           
-          {/* LOGO UTAMA (GAMBAR) */}
-          <Link href="/" className="flex items-center gap-3 group">
-            <div className="relative h-12 w-12 overflow-hidden rounded-full border-2 border-primary/20 group-hover:border-primary transition-colors duration-300">
-              {/* Pastikan file 'logo_dapuradida.JPG' ada di folder public */}
-              <Image 
-                src="/logo_dapuradida.JPG" 
-                alt="Logo Dapur Adida"
-                fill
-                className="object-cover"
-              />
-            </div>
-            <span className="text-xl font-extrabold tracking-tight text-primary group-hover:opacity-90 transition-opacity">
-              Dapur Adida.
-            </span>
-          </Link>
+          {/* LOGO (Kiri) */}
+          <div className="flex-shrink-0 z-20">
+            <Link href="/" className="flex items-center gap-3 group">
+              <div className="relative h-10 w-10 md:h-12 md:w-12 overflow-hidden rounded-full border-2 border-primary/20 group-hover:border-primary transition-colors duration-300">
+                <Image 
+                  src="/logo_dapuradida.JPG" 
+                  alt="Logo Dapur Adida"
+                  fill
+                  className="object-cover"
+                />
+              </div>
+              <span className="text-lg md:text-xl font-extrabold tracking-tight text-primary group-hover:opacity-90 transition-opacity hidden xs:block">
+                Dapur Adida.
+              </span>
+            </Link>
+          </div>
 
-          {/* Menu Desktop */}
-          <div className="hidden md:flex gap-8 text-sm font-semibold text-slate-600">
-            <Link href="#menu" className="hover:text-primary transition-colors">Menu</Link>
+          {/* Menu Desktop (Tengah Absolut) */}
+          <div className="hidden md:flex gap-8 text-sm font-semibold text-slate-600 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
+            <Link href="/menu" className="hover:text-primary transition-colors">Menu</Link>
             <Link href="#layanan" className="hover:text-primary transition-colors">Layanan</Link>
             <Link href="#testimoni" className="hover:text-primary transition-colors">Testimoni</Link>
           </div>
 
-          {/* LOGIKA LOGIN/LOGOUT */}
-          <div className="flex items-center gap-3">
+          {/* LOGIKA USER & CART (Kanan) */}
+          <div className="flex items-center gap-2 md:gap-3 z-20">
             {status === "loading" ? (
-              <span className="text-sm text-slate-400 animate-pulse">Memuat...</span>
+              <span className="text-xs md:text-sm text-slate-400 animate-pulse">Memuat...</span>
             ) : session ? (
               // JIKA SUDAH LOGIN
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2 text-sm font-bold text-primary bg-primary/5 px-4 py-2 rounded-full border border-primary/10">
+              <div className="flex items-center gap-2 md:gap-4">
+                
+                <Link href="/cart" className="relative p-2 hover:bg-slate-100 rounded-full transition-colors">
+                  <ShoppingCart className="h-6 w-6 text-slate-600 hover:text-primary" />
+                  {totalItems > 0 && (
+                    <span className="absolute top-0 right-0 bg-primary text-white text-[10px] font-bold h-4 w-4 rounded-full flex items-center justify-center shadow-sm animate-in zoom-in">
+                      {totalItems}
+                    </span>
+                  )}
+                </Link>
+
+                <div className="hidden md:flex items-center gap-2 text-sm font-bold text-primary bg-primary/5 px-4 py-2 rounded-full border border-primary/10">
                   <User className="h-4 w-4" />
-                  <span className="capitalize">{session.user?.name || "Kakak"}</span>
+                  <span className="capitalize truncate max-w-[100px]">{session.user?.name || "Kakak"}</span>
                 </div>
                 
                 <Button 
                   variant="destructive" 
                   size="sm" 
                   onClick={() => signOut({ callbackUrl: "/" })} 
-                  className="rounded-full px-4 h-9 shadow-md hover:shadow-lg transition-all"
+                  className="rounded-full w-9 h-9 p-0 md:w-auto md:px-4 md:h-9 shadow-md hover:shadow-lg transition-all"
                 >
-                  <LogOut className="mr-2 h-4 w-4" /> Keluar
+                  <LogOut className="h-4 w-4 md:mr-2" /> 
+                  <span className="hidden md:inline">Keluar</span>
                 </Button>
               </div>
             ) : (
               // JIKA BELUM LOGIN
               <>
                 <Link href="/login">
-                  <Button variant="ghost" size="sm" className="hidden sm:flex hover:text-primary hover:bg-primary/5 font-semibold">
+                  <Button variant="ghost" size="sm" className="hover:text-primary hover:bg-primary/5 font-semibold">
                     Masuk
                   </Button>
                 </Link>
                 <Link href="/register">
-                  <Button size="sm" className="rounded-full px-6 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all font-bold">
+                  <Button size="sm" className="rounded-full px-4 md:px-6 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all font-bold">
                     Daftar
                   </Button>
                 </Link>
@@ -97,7 +153,7 @@ export default function LandingPage() {
             ✨ Katering Harian & Prasmanan Terbaik
           </Badge>
           
-          <h1 className="text-5xl md:text-7xl font-black tracking-tight mb-6 leading-[1.1] text-slate-900 drop-shadow-sm">
+          <h1 className="text-4xl md:text-7xl font-black tracking-tight mb-6 leading-[1.1] text-slate-900 drop-shadow-sm">
             Rasa Bintang Lima, <br />
             <span className="text-slate-400">Harga Kaki Lima.</span>
           </h1>
@@ -108,12 +164,13 @@ export default function LandingPage() {
           </p>
 
           <div className="flex flex-col sm:flex-row justify-center gap-4">
-            <Link href={session ? "#menu" : "/register"}>
+            {/* Tombol Hero juga mengikuti logika yang sama */}
+            <Link href={session ? "/menu" : "/register"}>
               <Button size="lg" className="h-14 px-8 text-lg rounded-full w-full sm:w-auto bg-primary hover:bg-primary/90 shadow-xl shadow-primary/25 hover:shadow-2xl hover:shadow-primary/30 hover:-translate-y-1 transition-all duration-300 font-bold">
                 {session ? "Pesan Makanan" : "Pesan Sekarang"} <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
-            <Link href="#menu">
+            <Link href="/menu">
               <Button variant="outline" size="lg" className="h-14 px-8 text-lg rounded-full w-full sm:w-auto border-2 hover:bg-slate-50 hover:text-primary font-semibold">
                 Lihat Menu Hari Ini
               </Button>
@@ -162,7 +219,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ===== 4. MENU PREVIEW ===== */}
+      {/* ===== 4. MENU PREVIEW (Dynamic) ===== */}
       <section id="menu" className="py-24 bg-slate-50/50">
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-4">
@@ -177,29 +234,65 @@ export default function LandingPage() {
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <MenuCard 
-              category="Best Seller"
-              title="Ayam Bakar Madu"
-              desc="Ayam kampung bakar dengan olesan madu hutan, lengkap dengan lalapan dan sambal terasi."
-              price="Rp 25.000"
-            />
-            <MenuCard 
-              category="Healthy"
-              title="Salmon Teriyaki"
-              desc="Salmon fresh panggang saus teriyaki dengan nasi merah dan brokoli kukus."
-              price="Rp 45.000"
-            />
-            <MenuCard 
-              category="Hemat"
-              title="Paket Nasi Timbel"
-              desc="Nasi timbel komplit dengan ayam goreng, tahu, tempe, dan sayur asem segar."
-              price="Rp 20.000"
-            />
-          </div>
+          {loadingMenu ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {featuredMenus.map((menu) => (
+                <Card key={menu.id} className="overflow-hidden border-none shadow-md hover:shadow-2xl hover:shadow-slate-200 transition-all duration-300 group cursor-pointer bg-white rounded-3xl">
+                  <div className="h-56 bg-slate-100 w-full relative flex items-center justify-center text-slate-400 group-hover:bg-slate-200 transition-colors overflow-hidden">
+                    {menu.imageUrl ? (
+                      <Image 
+                        src={menu.imageUrl} 
+                        alt={menu.name} 
+                        fill 
+                        className="object-cover group-hover:scale-110 transition-transform duration-500" 
+                      />
+                    ) : (
+                      <ChefHat className="h-10 w-10 opacity-30 text-primary" />
+                    )}
+                    <Badge className="absolute top-4 left-4 bg-white/90 text-primary hover:bg-white border-none shadow-sm backdrop-blur-sm px-3 py-1 font-bold">
+                      Recommended
+                    </Badge>
+                  </div>
+                  
+                  <CardContent className="p-6">
+                    <div className="flex justify-between items-start mb-2 gap-2">
+                      <h3 className="font-bold text-lg text-slate-900 group-hover:text-primary transition-colors line-clamp-1">{menu.name}</h3>
+                      <div className="flex items-center gap-1 text-amber-500 text-xs font-bold bg-amber-50 px-2 py-1 rounded-md border border-amber-100 shrink-0">
+                        <Star className="h-3 w-3 fill-current" /> 4.8
+                      </div>
+                    </div>
+                    <p className="text-slate-500 text-sm mb-6 line-clamp-2 h-10 leading-relaxed">
+                      {menu.description || "Menu lezat khas Dapur Adida."}
+                    </p>
+                    <div className="flex justify-between items-center">
+                      <span className="font-black text-lg text-slate-900">{formatRupiah(menu.price)}</span>
+                      
+                      {/* MODIFIKASI TOMBOL DISINI */}
+                      {/* Jika sudah login -> Ke /menu, Jika belum -> Ke /login */}
+                      <Link href={session ? "/menu" : "/login"}>
+                        <Button 
+                          size="sm" 
+                          disabled={!menu.isAvailable}
+                          className="rounded-full h-9 px-5 bg-primary hover:bg-primary/90 text-white shadow-md hover:shadow-lg hover:shadow-primary/20 transition-all font-bold"
+                        >
+                          Pesan
+                        </Button>
+                      </Link>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
           
           <div className="mt-10 text-center md:hidden">
-            <Button variant="outline" className="w-full border-primary text-primary font-bold">Lihat Semua Menu</Button>
+            <Link href="/menu">
+              <Button variant="outline" className="w-full border-primary text-primary font-bold">Lihat Semua Menu</Button>
+            </Link>
           </div>
         </div>
       </section>
@@ -210,7 +303,6 @@ export default function LandingPage() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
             <div className="col-span-1 md:col-span-2">
               <div className="flex items-center gap-3 mb-6 text-white">
-                {/* Logo Footer */}
                 <div className="relative h-12 w-12 overflow-hidden rounded-full border-2 border-slate-600">
                    <Image 
                     src="/logo_dapuradida.JPG" 
@@ -283,37 +375,5 @@ function FeatureCard({ icon, title, desc }: { icon: React.ReactNode, title: stri
       <h3 className="text-xl font-bold mb-3 text-slate-900">{title}</h3>
       <p className="text-sm text-slate-600 leading-relaxed font-medium">{desc}</p>
     </div>
-  );
-}
-
-function MenuCard({ category, title, desc, price }: { category: string, title: string, desc: string, price: string }) {
-  return (
-    <Card className="overflow-hidden border-none shadow-md hover:shadow-2xl hover:shadow-slate-200 transition-all duration-300 group cursor-pointer bg-white rounded-3xl">
-      {/* Placeholder Gambar Makanan */}
-      <div className="h-56 bg-slate-100 w-full relative flex items-center justify-center text-slate-400 group-hover:bg-slate-200 transition-colors overflow-hidden">
-        <div className="bg-white/50 p-4 rounded-full">
-          <ChefHat className="h-10 w-10 opacity-30 text-primary" />
-        </div>
-        <span className="absolute bottom-4 text-xs font-bold opacity-40 uppercase tracking-widest">Foto Belum Tersedia</span>
-        <Badge className="absolute top-4 left-4 bg-white/90 text-primary hover:bg-white border-none shadow-sm backdrop-blur-sm px-3 py-1 font-bold">
-          {category}
-        </Badge>
-      </div>
-      <CardContent className="p-6">
-        <div className="flex justify-between items-start mb-2 gap-2">
-          <h3 className="font-bold text-lg text-slate-900 group-hover:text-primary transition-colors line-clamp-1">{title}</h3>
-          <div className="flex items-center gap-1 text-amber-500 text-xs font-bold bg-amber-50 px-2 py-1 rounded-md border border-amber-100 shrink-0">
-            <Star className="h-3 w-3 fill-current" /> 4.8
-          </div>
-        </div>
-        <p className="text-slate-500 text-sm mb-6 line-clamp-2 h-10 leading-relaxed">{desc}</p>
-        <div className="flex justify-between items-center">
-          <span className="font-black text-lg text-slate-900">{price}</span>
-          <Button size="sm" className="rounded-full h-9 px-5 bg-primary hover:bg-primary/90 text-white shadow-md hover:shadow-lg hover:shadow-primary/20 transition-all font-bold">
-            Tambah
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
   );
 }
