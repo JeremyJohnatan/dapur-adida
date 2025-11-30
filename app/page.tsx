@@ -18,7 +18,8 @@ import {
   User,
   ShoppingCart, 
   ChefHat,
-  Loader2 
+  Loader2,
+  MessageCircle // Import icon Message
 } from "lucide-react";
 
 // Tipe data Menu
@@ -34,8 +35,7 @@ interface Menu {
 export default function LandingPage() {
   const { data: session, status } = useSession();
   
-  // Kita hanya butuh totalItems untuk badge keranjang di navbar
-  const { totalItems } = useCart();
+  const { addToCart, totalItems } = useCart();
   
   const [featuredMenus, setFeaturedMenus] = useState<Menu[]>([]);
   const [loadingMenu, setLoadingMenu] = useState(true);
@@ -65,7 +65,7 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white text-slate-900 font-sans">
+    <div className="min-h-screen bg-white text-slate-900 font-sans relative">
       
       {/* ===== 1. NAVBAR ===== */}
       <nav className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur-md shadow-sm transition-all">
@@ -103,6 +103,12 @@ export default function LandingPage() {
               // JIKA SUDAH LOGIN
               <div className="flex items-center gap-2 md:gap-4">
                 
+                {/* 1. ICON CHAT DI NAVBAR */}
+                <Link href="/chat" className="relative p-2 hover:bg-slate-100 rounded-full transition-colors hidden sm:block" title="Chat Admin">
+                  <MessageCircle className="h-6 w-6 text-slate-600 hover:text-primary" />
+                </Link>
+
+                {/* ICON KERANJANG */}
                 <Link href="/cart" className="relative p-2 hover:bg-slate-100 rounded-full transition-colors">
                   <ShoppingCart className="h-6 w-6 text-slate-600 hover:text-primary" />
                   {totalItems > 0 && (
@@ -164,7 +170,6 @@ export default function LandingPage() {
           </p>
 
           <div className="flex flex-col sm:flex-row justify-center gap-4">
-            {/* Tombol Hero juga mengikuti logika yang sama */}
             <Link href={session ? "/menu" : "/register"}>
               <Button size="lg" className="h-14 px-8 text-lg rounded-full w-full sm:w-auto bg-primary hover:bg-primary/90 shadow-xl shadow-primary/25 hover:shadow-2xl hover:shadow-primary/30 hover:-translate-y-1 transition-all duration-300 font-bold">
                 {session ? "Pesan Makanan" : "Pesan Sekarang"} <ArrowRight className="ml-2 h-5 w-5" />
@@ -271,8 +276,6 @@ export default function LandingPage() {
                     <div className="flex justify-between items-center">
                       <span className="font-black text-lg text-slate-900">{formatRupiah(menu.price)}</span>
                       
-                      {/* MODIFIKASI TOMBOL DISINI */}
-                      {/* Jika sudah login -> Ke /menu, Jika belum -> Ke /login */}
                       <Link href={session ? "/menu" : "/login"}>
                         <Button 
                           size="sm" 
@@ -351,6 +354,19 @@ export default function LandingPage() {
           </div>
         </div>
       </footer>
+
+      {/* ===== FLOATING CHAT BUTTON (Muncul kalau login) ===== */}
+      {session && (
+        <Link href="/chat">
+          <div className="fixed bottom-6 right-6 z-50 animate-in slide-in-from-bottom-4">
+            <Button className="rounded-full h-14 px-6 bg-primary hover:bg-primary/90 text-white shadow-2xl flex items-center gap-2 transition-transform hover:scale-105 border-4 border-white/20 backdrop-blur-sm">
+              <MessageCircle className="h-6 w-6" />
+              <span className="font-bold text-lg hidden sm:inline">Chat Admin</span>
+            </Button>
+          </div>
+        </Link>
+      )}
+
     </div>
   );
 }

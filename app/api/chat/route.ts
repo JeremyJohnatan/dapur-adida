@@ -5,18 +5,72 @@ import { authOptions } from "../auth/[...nextauth]/route";
 
 const prisma = new PrismaClient();
 
-// GET: Ambil riwayat chat user yang sedang login
 export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const mode = searchParams.get("mode"); // 'inbox' atau null
+  const partnerId = searchParams.get("userId"); // ID lawan bicara
+
+  const session = await getServerSession(authOptions);
+  if (!session || !session.user) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+
+  const userId = session.user.id;
+  const role = session.user.role;
+
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    // --- MODE 1: ADMIN LIHAT DAFTAR INBOX (List Kontak) ---
+    if (role === "ADMIN" && mode === "inbox") {
+      // Ambil semua chat yang melibatkan admin
+      const chats = await prisma.chat.findMany({
+        where: { OR: [{ senderId: userId }, { receiverId: userId }] },
+        orderBy: { sentAt: 'desc' },
+        include: {
+          sender: { select: { id: true, fullName: true, role: true } },
+          receiver: { select: { id: true, fullName: true, role: true } }
+        }
+      });
+
+      // Grouping berdasarkan User Lawan Bicara (Partner)
+      const inboxMap = new Map();
+      
+      for (const chat of chats) {
+        // Tentukan siapa lawan bicaranya
+        const partner = chat.senderId === userId ? chat.receiver : chat.sender;
+        
+        // Masukkan ke map jika belum ada (karena urutan desc, yang pertama masuk adalah chat terbaru)
+        if (!inboxMap.has(partner.id)) {
+          inboxMap.set(partner.id, {
+            userId: partner.id,
+            name: partner.fullName,
+            role: partner.role,
+            lastMessage: chat.message,
+            lastTime: chat.sentAt,
+            unread: !chat.isRead && chat.receiverId === userId
+          });
+        }
+      }
+
+      return NextResponse.json(Array.from(inboxMap.values()));
     }
 
-    const userId = session.user.id;
+    // --- MODE 2: DETAIL CHAT ROOM (Admin buka chat spesifik user) ---
+    if (role === "ADMIN" && partnerId) {
+      const chats = await prisma.chat.findMany({
+        where: {
+          OR: [
+            { senderId: userId, receiverId: partnerId },
+            { senderId: partnerId, receiverId: userId }
+          ]
+        },
+        orderBy: { sentAt: 'asc' },
+        include: { sender: { select: { fullName: true } } }
+      });
+      return NextResponse.json(chats);
+    }
 
-    // Ambil pesan di mana user sebagai pengirim ATAU penerima
-    // Diurutkan dari yang terlama ke terbaru (biar seperti chat WA)
+    // --- MODE 3: CUSTOMER (Hanya lihat chat sendiri dengan Admin) ---
+    // Customer tidak butuh inbox, langsung chat room dengan Admin
     const chats = await prisma.chat.findMany({
       where: {
         OR: [
@@ -24,77 +78,55 @@ export async function GET(request: Request) {
           { receiverId: userId }
         ]
       },
-      orderBy: {
-        sentAt: 'asc',
-      },
-      include: {
-        sender: { select: { fullName: true, role: true } },
-        receiver: { select: { fullName: true, role: true } }
-      }
+      orderBy: { sentAt: 'asc' },
+      include: { sender: { select: { fullName: true } } }
     });
 
     return NextResponse.json(chats);
+
   } catch (error) {
-    console.error("Get Chat Error:", error);
-    return NextResponse.json({ message: "Gagal memuat pesan" }, { status: 500 });
+    console.error("Chat API Error:", error);
+    return NextResponse.json({ message: "Error" }, { status: 500 });
   }
 }
 
-// POST: Kirim pesan baru
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || !session.user) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-    }
+    if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
 
     const body = await request.json();
-    const { message } = body;
+    const { message, targetUserId } = body; // targetUserId opsional untuk Admin
 
-    if (!message) {
-      return NextResponse.json({ message: "Pesan tidak boleh kosong" }, { status: 400 });
-    }
+    if (!message) return NextResponse.json({ message: "Kosong" }, { status: 400 });
 
     const senderId = session.user.id;
-    const senderRole = session.user.role; // Perlu type assertion jika typescript komplain, tapi sementara aman
-
+    const senderRole = session.user.role;
     let receiverId = "";
 
-    // LOGIKA PENENTUAN PENERIMA:
-    // Jika yang kirim Customer -> Kirim ke Admin
-    if (senderRole === "CUSTOMER") {
-      // Cari Admin pertama yang ada di database
-      const admin = await prisma.user.findFirst({
-        where: { role: "ADMIN" }
-      });
-
-      if (!admin) {
-        // Fallback darurat jika belum ada admin: Kirim ke diri sendiri dulu (atau handle error)
-        // Idealnya kamu harus punya 1 user ROLE 'ADMIN' di database.
-        // Untuk tutorial ini, kita cari user apapun yang BUKAN pengirim, atau kembalikan error.
-        return NextResponse.json({ message: "Belum ada Admin yang tersedia untuk menerima pesan." }, { status: 404 });
+    if (senderRole === "ADMIN") {
+      // Admin WAJIB kirim targetUserId (mau balas ke siapa)
+      if (!targetUserId) {
+        return NextResponse.json({ message: "Admin harus memilih tujuan kirim" }, { status: 400 });
       }
-      receiverId = admin.id;
+      receiverId = targetUserId;
     } else {
-      // Jika yang kirim Admin -> Kirim ke Customer (Nanti dikembangkan, butuh customerId dari body)
-      // Untuk sekarang kita fokus Customer -> Admin dulu
-      return NextResponse.json({ message: "Fitur reply admin belum diaktifkan di endpoint ini." }, { status: 400 });
+      // Customer otomatis kirim ke Admin
+      const admin = await prisma.user.findFirst({ where: { role: "ADMIN" } });
+      receiverId = admin ? admin.id : senderId; // Fallback ke diri sendiri jika error
     }
 
-    // Simpan Pesan
     const newChat = await prisma.chat.create({
       data: {
         message,
         senderId,
         receiverId,
-        isRead: false,
+        isRead: false
       }
     });
 
     return NextResponse.json(newChat, { status: 201 });
-
   } catch (error) {
-    console.error("Send Chat Error:", error);
-    return NextResponse.json({ message: "Gagal mengirim pesan" }, { status: 500 });
+    return NextResponse.json({ message: "Error" }, { status: 500 });
   }
 }
