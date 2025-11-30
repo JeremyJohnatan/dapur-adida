@@ -1,50 +1,106 @@
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
-import { getServerSession } from "next-auth";
-import { authOptions } from "../../auth/[...nextauth]/route";
+import { getServerSession } from "next-auth"; 
+import { authOptions } from "../auth/[...nextauth]/route"; 
+import { beamsClient } from "@/lib/beams"; 
 
 const prisma = new PrismaClient();
 
-export async function GET() {
-  const session = await getServerSession(authOptions);
-
-  // Proteksi API: Hanya Admin
-  if (!session || session.user.role !== "ADMIN") {
-    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
-  }
-
+// --- BARU: GET PESANAN SAYA (History) ---
+export async function GET(request: Request) {
   try {
-    const orders = await prisma.order.findMany({
-      orderBy: { createdAt: 'desc' }, // Pesanan terbaru di atas
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user) {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    }
+
+    // Ambil pesanan milik user yang sedang login saja
+    const myOrders = await prisma.order.findMany({
+      where: {
+        userId: session.user.id
+      },
+      orderBy: {
+        createdAt: 'desc' // Yang terbaru di atas
+      },
       include: {
-        user: { select: { fullName: true, email: true } }, // Ambil nama pemesan
         items: {
-          include: { menu: true } // Ambil detail menu yang dipesan
+          include: {
+            menu: true // Sertakan detail menu (nama, gambar)
+          }
         }
       }
     });
 
-    return NextResponse.json(orders);
+    return NextResponse.json(myOrders);
   } catch (error) {
-    return NextResponse.json({ message: "Error fetching orders" }, { status: 500 });
+    console.error("Get Order Error:", error);
+    return NextResponse.json({ message: "Gagal mengambil data pesanan" }, { status: 500 });
   }
 }
 
-// API untuk Update Status (Misal: Pending -> Cooking)
-export async function PATCH(request: Request) {
-  const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== "ADMIN") return NextResponse.json({ message: "Forbidden" }, { status: 403 });
-
-  const body = await request.json();
-  const { orderId, status } = body;
-
+// --- POST (TETAP SAMA SEPERTI SEBELUMNYA) ---
+export async function POST(request: Request) {
   try {
-    const updatedOrder = await prisma.order.update({
-      where: { id: orderId },
-      data: { status },
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user) {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { items, totalPrice } = body;
+
+    if (!items || items.length === 0) {
+      return NextResponse.json({ message: "Keranjang kosong" }, { status: 400 });
+    }
+
+    const newOrder = await prisma.$transaction(async (tx) => {
+      const order = await tx.order.create({
+        data: {
+          userId: session.user.id,
+          totalAmount: totalPrice,
+          status: "PENDING",
+        },
+      });
+
+      for (const item of items) {
+        await tx.orderItem.create({
+          data: {
+            orderId: order.id,
+            menuId: item.id,
+            quantity: item.quantity,
+            price: item.price,
+            subtotal: item.price * item.quantity,
+          },
+        });
+      }
+      return order;
     });
-    return NextResponse.json(updatedOrder);
+
+    // --- KIRIM NOTIFIKASI BEAMS KE ADMIN ---
+    try {
+      await beamsClient.publishToInterests(["admin-global"], {
+        web: {
+          notification: {
+            title: "Pesanan Baru Masuk! 💰",
+            body: `${session.user.name} baru saja memesan senilai Rp ${totalPrice.toLocaleString()}`,
+            deep_link: "http://localhost:3000/admin/orders", // Arahkan admin ke halaman order
+          },
+        },
+      });
+    } catch (beamError) {
+      console.error("Gagal kirim notif Beams:", beamError);
+    }
+
+    return NextResponse.json(
+      { message: "Order berhasil", orderId: newOrder.id },
+      { status: 201 }
+    );
+
   } catch (error) {
-    return NextResponse.json({ message: "Error updating order" }, { status: 500 });
+    console.error("Order Error:", error);
+    return NextResponse.json(
+      { message: "Gagal membuat pesanan" },
+      { status: 500 }
+    );
   }
 }

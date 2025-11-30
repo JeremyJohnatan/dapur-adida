@@ -8,6 +8,7 @@ import { useCart } from "@/context/CartContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { pusherClient } from "@/lib/pusher"; 
 import { 
   ArrowRight, 
   Clock, 
@@ -19,7 +20,9 @@ import {
   ShoppingCart, 
   ChefHat,
   Loader2,
-  MessageCircle // Import icon Message
+  MessageCircle,
+  Bell,
+  ClipboardList // <-- Icon untuk Riwayat Pesanan
 } from "lucide-react";
 
 // Tipe data Menu
@@ -34,12 +37,33 @@ interface Menu {
 
 export default function LandingPage() {
   const { data: session, status } = useSession();
-  
   const { addToCart, totalItems } = useCart();
-  
   const [featuredMenus, setFeaturedMenus] = useState<Menu[]>([]);
   const [loadingMenu, setLoadingMenu] = useState(true);
+  
+  // State untuk Notifikasi Popup
+  const [notification, setNotification] = useState<{message: string, show: boolean} | null>(null);
 
+  // --- LOGIKA NOTIFIKASI PUSHER DI HOME ---
+  useEffect(() => {
+    if (!session?.user) return;
+
+    const userId = session.user.id;
+    const channel = pusherClient.subscribe(`chat-${userId}`);
+
+    channel.bind("new-message", (data: any) => {
+      if (data.senderId !== userId) {
+        setNotification({ message: "Pesan baru dari Admin!", show: true });
+        setTimeout(() => setNotification(null), 4000);
+      }
+    });
+
+    return () => {
+      pusherClient.unsubscribe(`chat-${userId}`);
+    };
+  }, [session]);
+
+  // Fetch Menu
   useEffect(() => {
     const fetchFeaturedMenus = async () => {
       try {
@@ -52,7 +76,6 @@ export default function LandingPage() {
         setLoadingMenu(false);
       }
     };
-
     fetchFeaturedMenus();
   }, []);
 
@@ -67,6 +90,22 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans relative">
       
+      {/* ===== NOTIFIKASI POPUP (TOAST) ===== */}
+      {notification && (
+        <div className="fixed top-24 right-4 z-50 bg-white border-l-4 border-primary shadow-2xl p-4 rounded-r-lg flex items-center gap-3 animate-in slide-in-from-right">
+          <div className="bg-primary/10 p-2 rounded-full">
+            <Bell className="h-5 w-5 text-primary animate-bounce" />
+          </div>
+          <div>
+            <h4 className="font-bold text-sm text-slate-800">Pesan Masuk</h4>
+            <p className="text-xs text-slate-500">{notification.message}</p>
+          </div>
+          <Link href="/chat">
+            <Button size="sm" className="ml-2 h-8 text-xs bg-primary hover:bg-primary/90">Lihat</Button>
+          </Link>
+        </div>
+      )}
+
       {/* ===== 1. NAVBAR ===== */}
       <nav className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur-md shadow-sm transition-all">
         <div className="container mx-auto px-4 h-20 flex items-center justify-between relative">
@@ -103,12 +142,17 @@ export default function LandingPage() {
               // JIKA SUDAH LOGIN
               <div className="flex items-center gap-2 md:gap-4">
                 
-                {/* 1. ICON CHAT DI NAVBAR */}
+                {/* 1. ICON CHAT */}
                 <Link href="/chat" className="relative p-2 hover:bg-slate-100 rounded-full transition-colors hidden sm:block" title="Chat Admin">
                   <MessageCircle className="h-6 w-6 text-slate-600 hover:text-primary" />
                 </Link>
 
-                {/* ICON KERANJANG */}
+                {/* 2. ICON RIWAYAT PESANAN (BARU) */}
+                <Link href="/orders" className="relative p-2 hover:bg-slate-100 rounded-full transition-colors" title="Riwayat Pesanan">
+                  <ClipboardList className="h-6 w-6 text-slate-600 hover:text-primary" />
+                </Link>
+
+                {/* 3. ICON KERANJANG */}
                 <Link href="/cart" className="relative p-2 hover:bg-slate-100 rounded-full transition-colors">
                   <ShoppingCart className="h-6 w-6 text-slate-600 hover:text-primary" />
                   {totalItems > 0 && (
@@ -259,7 +303,7 @@ export default function LandingPage() {
                       <ChefHat className="h-10 w-10 opacity-30 text-primary" />
                     )}
                     <Badge className="absolute top-4 left-4 bg-white/90 text-primary hover:bg-white border-none shadow-sm backdrop-blur-sm px-3 py-1 font-bold">
-                      Recommended
+                      Rekomendasi
                     </Badge>
                   </div>
                   
@@ -276,6 +320,7 @@ export default function LandingPage() {
                     <div className="flex justify-between items-center">
                       <span className="font-black text-lg text-slate-900">{formatRupiah(menu.price)}</span>
                       
+                      {/* Navigasi: Login/Menu */}
                       <Link href={session ? "/menu" : "/login"}>
                         <Button 
                           size="sm" 

@@ -13,8 +13,6 @@ import { Badge } from "@/components/ui/badge";
 // --- KONFIGURASI CLOUDINARY ---
 // 1. Cloud Name: Cek di Dashboard Cloudinary (biasanya nama pendek tanpa spasi)
 const CLOUDINARY_CLOUD_NAME = "dvntlphzd"; 
-
-// 2. Upload Preset: Yang baru saja kamu buat
 const CLOUDINARY_UPLOAD_PRESET = "dapur-adida-preset"; 
 
 // Tipe Data Menu

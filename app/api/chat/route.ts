@@ -2,26 +2,26 @@ import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/route";
+import { pusherServer } from "@/lib/pusher"; 
+import { beamsClient } from "@/lib/beams"; 
 
 const prisma = new PrismaClient();
 
+// GET: Ambil riwayat chat
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const mode = searchParams.get("mode"); // 'inbox' atau null
-  const partnerId = searchParams.get("userId"); // ID lawan bicara
+  const mode = searchParams.get("mode");
+  const partnerId = searchParams.get("userId");
 
   const session = await getServerSession(authOptions);
-  if (!session || !session.user) {
-    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-  }
+  if (!session || !session.user) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
 
   const userId = session.user.id;
   const role = session.user.role;
 
   try {
-    // --- MODE 1: ADMIN LIHAT DAFTAR INBOX (List Kontak) ---
+    // Mode Inbox Admin
     if (role === "ADMIN" && mode === "inbox") {
-      // Ambil semua chat yang melibatkan admin
       const chats = await prisma.chat.findMany({
         where: { OR: [{ senderId: userId }, { receiverId: userId }] },
         orderBy: { sentAt: 'desc' },
@@ -31,53 +31,41 @@ export async function GET(request: Request) {
         }
       });
 
-      // Grouping berdasarkan User Lawan Bicara (Partner)
       const inboxMap = new Map();
-      
       for (const chat of chats) {
-        // Tentukan siapa lawan bicaranya
         const partner = chat.senderId === userId ? chat.receiver : chat.sender;
-        
-        // Masukkan ke map jika belum ada (karena urutan desc, yang pertama masuk adalah chat terbaru)
         if (!inboxMap.has(partner.id)) {
           inboxMap.set(partner.id, {
             userId: partner.id,
             name: partner.fullName,
-            role: partner.role,
             lastMessage: chat.message,
             lastTime: chat.sentAt,
             unread: !chat.isRead && chat.receiverId === userId
           });
         }
       }
-
       return NextResponse.json(Array.from(inboxMap.values()));
     }
 
-    // --- MODE 2: DETAIL CHAT ROOM (Admin buka chat spesifik user) ---
-    if (role === "ADMIN" && partnerId) {
-      const chats = await prisma.chat.findMany({
-        where: {
+    // Mode Detail Chat (Room)
+    // Jika Admin -> Ambil chat dengan partnerId (Customer)
+    // Jika Customer -> Ambil chat dengan Admin (userId sendiri vs Admin)
+    const filter = role === "ADMIN" && partnerId 
+      ? {
           OR: [
             { senderId: userId, receiverId: partnerId },
             { senderId: partnerId, receiverId: userId }
           ]
-        },
-        orderBy: { sentAt: 'asc' },
-        include: { sender: { select: { fullName: true } } }
-      });
-      return NextResponse.json(chats);
-    }
+        }
+      : {
+          OR: [
+            { senderId: userId },
+            { receiverId: userId }
+          ]
+        };
 
-    // --- MODE 3: CUSTOMER (Hanya lihat chat sendiri dengan Admin) ---
-    // Customer tidak butuh inbox, langsung chat room dengan Admin
     const chats = await prisma.chat.findMany({
-      where: {
-        OR: [
-          { senderId: userId },
-          { receiverId: userId }
-        ]
-      },
+      where: filter,
       orderBy: { sentAt: 'asc' },
       include: { sender: { select: { fullName: true } } }
     });
@@ -85,48 +73,79 @@ export async function GET(request: Request) {
     return NextResponse.json(chats);
 
   } catch (error) {
-    console.error("Chat API Error:", error);
     return NextResponse.json({ message: "Error" }, { status: 500 });
   }
 }
 
+// POST: Kirim Pesan
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
     if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
 
     const body = await request.json();
-    const { message, targetUserId } = body; // targetUserId opsional untuk Admin
-
-    if (!message) return NextResponse.json({ message: "Kosong" }, { status: 400 });
+    const { message, targetUserId } = body;
 
     const senderId = session.user.id;
     const senderRole = session.user.role;
     let receiverId = "";
 
+    // Logika Penerima
     if (senderRole === "ADMIN") {
-      // Admin WAJIB kirim targetUserId (mau balas ke siapa)
-      if (!targetUserId) {
-        return NextResponse.json({ message: "Admin harus memilih tujuan kirim" }, { status: 400 });
-      }
+      if (!targetUserId) return NextResponse.json({ message: "Target required" }, { status: 400 });
       receiverId = targetUserId;
     } else {
-      // Customer otomatis kirim ke Admin
       const admin = await prisma.user.findFirst({ where: { role: "ADMIN" } });
-      receiverId = admin ? admin.id : senderId; // Fallback ke diri sendiri jika error
+      receiverId = admin ? admin.id : senderId;
     }
 
+    // Simpan Database
     const newChat = await prisma.chat.create({
-      data: {
-        message,
-        senderId,
-        receiverId,
-        isRead: false
-      }
+      data: { message, senderId, receiverId, isRead: false },
+      include: { sender: { select: { fullName: true } } }
     });
+
+    // --- LOGIKA CHANNEL NAME (PENTING!) ---
+    // Channel selalu menggunakan ID Customer.
+    // Jika Admin kirim ke Budi -> Channel: chat-ID_BUDI
+    // Jika Budi kirim ke Admin -> Channel: chat-ID_BUDI
+    const customerId = senderRole === "ADMIN" ? receiverId : senderId;
+    const channelName = `chat-${customerId}`;
+
+    // 1. Trigger Update Chat Room
+    await pusherServer.trigger(channelName, "new-message", newChat);
+
+    // 2. Trigger Inbox Admin (Jika pengirim bukan admin)
+    if (senderRole !== "ADMIN") {
+      await pusherServer.trigger("admin-channel", "new-inbox", {
+        userId: senderId,
+        name: session.user.name,
+        lastMessage: message,
+        lastTime: newChat.sentAt
+      });
+    }
+
+    // 3. Trigger Notifikasi (Beams)
+    try {
+      const notifyInterest = senderRole === "ADMIN" ? `user-${receiverId}` : "admin-global";
+      const notifyTitle = senderRole === "ADMIN" ? "Pesan dari Admin" : `Pesan dari ${session.user.name}`;
+      
+      await beamsClient.publishToInterests([notifyInterest], {
+        web: {
+          notification: {
+            title: notifyTitle,
+            body: message,
+            deep_link: "http://localhost:3000/chat",
+          },
+        },
+      });
+    } catch (e) {
+      console.log("Beams error (optional)");
+    }
 
     return NextResponse.json(newChat, { status: 201 });
   } catch (error) {
+    console.error(error);
     return NextResponse.json({ message: "Error" }, { status: 500 });
   }
 }
