@@ -22,7 +22,8 @@ import {
   Loader2,
   MessageCircle,
   Bell,
-  ClipboardList // <-- Icon untuk Riwayat Pesanan
+  ClipboardList,
+  LayoutDashboard // <-- Import Icon Dashboard
 } from "lucide-react";
 
 // Tipe data Menu
@@ -142,12 +143,19 @@ export default function LandingPage() {
               // JIKA SUDAH LOGIN
               <div className="flex items-center gap-2 md:gap-4">
                 
+                {/* --- KHUSUS ADMIN: TOMBOL DASHBOARD --- */}
+                {session.user.role === "ADMIN" && (
+                  <Link href="/admin" className="relative p-2 hover:bg-slate-100 rounded-full transition-colors text-primary" title="Ke Dashboard Admin">
+                    <LayoutDashboard className="h-6 w-6" />
+                  </Link>
+                )}
+
                 {/* 1. ICON CHAT */}
                 <Link href="/chat" className="relative p-2 hover:bg-slate-100 rounded-full transition-colors hidden sm:block" title="Chat Admin">
                   <MessageCircle className="h-6 w-6 text-slate-600 hover:text-primary" />
                 </Link>
 
-                {/* 2. ICON RIWAYAT PESANAN (BARU) */}
+                {/* 2. ICON RIWAYAT PESANAN */}
                 <Link href="/orders" className="relative p-2 hover:bg-slate-100 rounded-full transition-colors" title="Riwayat Pesanan">
                   <ClipboardList className="h-6 w-6 text-slate-600 hover:text-primary" />
                 </Link>
@@ -320,7 +328,6 @@ export default function LandingPage() {
                     <div className="flex justify-between items-center">
                       <span className="font-black text-lg text-slate-900">{formatRupiah(menu.price)}</span>
                       
-                      {/* Navigasi: Login/Menu */}
                       <Link href={session ? "/menu" : "/login"}>
                         <Button 
                           size="sm" 

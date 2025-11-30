@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { signIn } from 'next-auth/react';
+import { signIn, getSession } from 'next-auth/react'; // Tambah getSession
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -24,9 +24,9 @@ export default function LoginPage() {
     const username = formData.get("username") as string;
     const password = formData.get("password") as string;
 
-    // Login menggunakan NextAuth Credentials
+    // 1. Coba Login
     const res = await signIn("credentials", {
-      username, // Kirim username
+      username,
       password,
       redirect: false,
     });
@@ -35,9 +35,19 @@ export default function LoginPage() {
       setError("Username atau Password salah!");
       setIsLoading(false);
     } else {
-      // Jika berhasil, refresh halaman dan arahkan ke Home
+      // 2. Login Sukses! Sekarang cek Role-nya apa?
+      // Kita panggil session terbaru untuk melihat data user
+      const session = await getSession();
+      
+      if (session?.user?.role === "ADMIN") {
+        // Jika ADMIN -> Langsung ke Dashboard
+        router.push("/admin");
+      } else {
+        // Jika CUSTOMER -> Ke Landing Page
+        router.push("/");
+      }
+      
       router.refresh();
-      router.push("/"); 
     }
   }
 
@@ -48,7 +58,7 @@ export default function LoginPage() {
           <div className='flex justify-center mb-2'>
             <ChefHat className="h-10 w-10 text-slate-900" />
           </div>
-          <CardTitle className="text-2xl font-bold text-slate-800">Masuk</CardTitle>
+          <CardTitle className="text-2xl font-bold text-slate-800">Masuk ke Dapur Adida</CardTitle>
           <CardDescription>
             Masukkan username dan kata sandi Anda.
           </CardDescription>
@@ -57,12 +67,11 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit}>
           <CardContent className="grid gap-4">
             {error && (
-              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative text-sm animate-pulse">
+              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative text-sm">
                 {error}
               </div>
             )}
 
-            {/* INPUT USERNAME */}
             <div className="grid gap-2">
               <Label htmlFor="username">Username</Label>
               <Input 
@@ -82,10 +91,13 @@ export default function LoginPage() {
               <Input id="password" name="password" type="password" required disabled={isLoading} />
             </div>
           </CardContent>
-          
           <CardFooter className="flex flex-col gap-3">
             <Button className="w-full bg-slate-900 hover:bg-slate-800" disabled={isLoading}>
-              {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Masuk"}
+              {isLoading ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Masuk...</>
+              ) : (
+                "Masuk"
+              )}
             </Button>
             <p className="text-sm text-center text-slate-500">
               Belum punya akun?{' '}
