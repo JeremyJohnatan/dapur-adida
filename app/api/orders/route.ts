@@ -3,79 +3,61 @@ import { PrismaClient } from "@prisma/client";
 import { getServerSession } from "next-auth"; 
 import { authOptions } from "../auth/[...nextauth]/route"; 
 import { beamsClient } from "@/lib/beams"; 
+import { Xendit } from 'xendit-node'; 
 
 const prisma = new PrismaClient();
 
-// --- GET PESANAN SAYA ---
+const apiKey = process.env.XENDIT_SECRET_KEY;
+const xenditClient = new Xendit({ secretKey: apiKey || "" });
+
+// --- GET ---
 export async function GET(request: Request) {
   try {
     const session = await getServerSession(authOptions);
+    if (!session || !session.user) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     
-    // DEBUG 1: Cek siapa yang request
-    console.log("🔍 API GET ORDERS dipanggil");
-    
-    if (!session || !session.user) {
-      console.log("❌ User tidak ada session");
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-    }
-
-    console.log("👤 User yang login ID:", session.user.id);
-    console.log("👤 User Name:", session.user.name);
-
-    // Ambil pesanan milik user yang sedang login saja
     const myOrders = await prisma.order.findMany({
-      where: {
-        userId: session.user.id // Pastikan ini string ID yang benar
-      },
-      orderBy: {
-        createdAt: 'desc'
-      },
-      include: {
-        items: {
-          include: {
-            menu: true
-          }
-        }
-      }
+      where: { userId: session.user.id },
+      orderBy: { createdAt: 'desc' },
+      include: { items: { include: { menu: true } }, payment: true }
     });
-
-    // DEBUG 2: Cek hasil database
-    console.log("📦 Jumlah pesanan ditemukan:", myOrders.length);
-    if (myOrders.length > 0) {
-        console.log("✅ Contoh Order ID:", myOrders[0].id);
-    } else {
-        console.log("⚠️ Tidak ada pesanan untuk User ID ini.");
-    }
-
     return NextResponse.json(myOrders);
   } catch (error) {
-    console.error("❌ Error Get Order:", error);
-    return NextResponse.json({ message: "Gagal mengambil data pesanan" }, { status: 500 });
+    return NextResponse.json({ message: "Gagal mengambil data" }, { status: 500 });
   }
 }
 
-// --- POST BUAT PESANAN ---
+// --- POST ---
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || !session.user) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-    }
+    if (!session || !session.user) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
 
     const body = await request.json();
     const { items, totalPrice } = body;
 
-    console.log("📝 Membuat Order Baru untuk User ID:", session.user.id);
+    if (!items || items.length === 0) return NextResponse.json({ message: "Keranjang kosong" }, { status: 400 });
 
-    if (!items || items.length === 0) {
-      return NextResponse.json({ message: "Keranjang kosong" }, { status: 400 });
+    const amountNumber = Number(totalPrice);
+    
+    // Fallback Email
+    let validEmail = "customer@dapuradida.com";
+    const sessionEmail = session.user.email;
+    if (sessionEmail && sessionEmail.includes("@")) {
+      validEmail = sessionEmail;
+    } else {
+       const sanitizedName = session.user.name?.replace(/\s+/g, '').toLowerCase() || "user";
+       validEmail = `${sanitizedName}@temp.dapuradida.com`;
     }
 
-    const newOrder = await prisma.$transaction(async (tx) => {
+    // Base URL (Ganti ini jika nanti deploy ke Vercel)
+    const BASE_URL = process.env.NEXTAUTH_URL || "http://localhost:3000";
+
+    const result = await prisma.$transaction(async (tx) => {
       const order = await tx.order.create({
         data: {
           userId: session.user.id,
-          totalAmount: totalPrice,
+          totalAmount: amountNumber,
           status: "PENDING",
         },
       });
@@ -91,35 +73,58 @@ export async function POST(request: Request) {
           },
         });
       }
-      return order;
-    });
-  
+      
+      // BUAT INVOICE DENGAN REDIRECT URL
+      const xenditInvoice = await xenditClient.Invoice.createInvoice({
+        data: {
+          externalId: order.id,
+          amount: amountNumber,
+          payerEmail: validEmail,
+          description: `Order #${order.id.slice(-5)} - Dapur Adida`,
+          invoiceDuration: 86400,
+          currency: "IDR",
+          // INI PENTING: Arahkan balik ke halaman sukses/gagal di aplikasi kita
+          successRedirectUrl: `${BASE_URL}/order-success`, 
+          failureRedirectUrl: `${BASE_URL}/cart`,
+        }
+      });
 
-    // Notifikasi Beams
+      const paymentLink = xenditInvoice.invoiceUrl || (xenditInvoice as any).invoice_url;
+      if (!paymentLink) throw new Error("Gagal dapat Link Pembayaran");
+
+      await tx.payment.create({
+        data: {
+          orderId: order.id,
+          amount: amountNumber,
+          status: "PENDING",
+          xenditInvoiceId: xenditInvoice.id,
+          paymentUrl: paymentLink, 
+        }
+      });
+
+      return { order, paymentLink };
+    });
+
     try {
       await beamsClient.publishToInterests(["admin-global"], {
         web: {
           notification: {
-            title: "Pesanan Baru Masuk! 💰",
-            body: `${session.user.name} baru saja memesan senilai Rp ${totalPrice.toLocaleString()}`,
+            title: "Tagihan Baru 💳",
+            body: `${session.user.name} memesan Rp ${amountNumber.toLocaleString()}`,
             deep_link: "http://localhost:3000/admin/orders",
           },
         },
       });
-    } catch (beamError) {
-      console.error("Gagal kirim notif Beams:", beamError);
-    }
+    } catch (e) {}
 
-    return NextResponse.json(
-      { message: "Order berhasil", orderId: newOrder.id },
-      { status: 201 }
-    );
+    return NextResponse.json({ 
+        message: "Order berhasil", 
+        orderId: result.order.id,
+        paymentUrl: result.paymentLink 
+      }, { status: 201 });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Order Error:", error);
-    return NextResponse.json(
-      { message: "Gagal membuat pesanan" },
-      { status: 500 }
-    );
+    return NextResponse.json({ message: error.message || "Gagal" }, { status: 500 });
   }
 }

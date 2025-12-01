@@ -5,7 +5,7 @@ import Image from "next/image";
 import { useCart } from "@/context/CartContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Trash2, Plus, Minus, ArrowLeft, ShoppingBag, MessageCircle, Loader2, CheckCircle } from "lucide-react";
+import { Trash2, Plus, Minus, ArrowLeft, ShoppingBag, CreditCard, Loader2 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -15,9 +15,7 @@ export default function CartPage() {
   const { data: session } = useSession();
   const router = useRouter();
   
-  // State untuk loading & sukses
   const [isCheckingOut, setIsCheckingOut] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
 
   const formatRupiah = (price: number) => {
     return new Intl.NumberFormat("id-ID", {
@@ -27,7 +25,6 @@ export default function CartPage() {
     }).format(price);
   };
 
-  // --- FUNGSI CHECKOUT SISTEM ---
   const handleCheckout = async () => {
     if (!session) {
       alert("Silakan login terlebih dahulu untuk memesan.");
@@ -38,8 +35,7 @@ export default function CartPage() {
     setIsCheckingOut(true);
 
     try {
-      // 1. Simpan Order ke Database
-      const orderRes = await fetch("/api/orders", {
+      const res = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -48,47 +44,28 @@ export default function CartPage() {
         }),
       });
 
-      const orderData = await orderRes.json();
+      const data = await res.json();
 
-      if (!orderRes.ok) {
-        throw new Error(orderData.message || "Gagal membuat pesanan");
+      if (!res.ok) throw new Error(data.message || "Gagal membuat pesanan");
+
+      if (data.paymentUrl) {
+        // JANGAN clearCart() DI SINI. 
+        // Biarkan user bayar dulu. Kalau sukses, Xendit akan lempar ke halaman sukses, baru kita clear di sana.
+        window.location.href = data.paymentUrl; 
+      } else {
+        alert("Gagal mendapatkan link pembayaran.");
+        setIsCheckingOut(false);
       }
-
-      // 2. Format Pesan
-      const orderIdShort = orderData.orderId.slice(-5).toUpperCase();
-      let message = `Halo Admin, saya *${session.user?.name}* baru saja checkout pesanan *#${orderIdShort}*:\n\n`;
-      items.forEach((item, index) => {
-        message += `${index + 1}. ${item.name} x${item.quantity}\n`;
-      });
-      message += `\nTotal: ${formatRupiah(totalPrice)}`;
-      message += `\n\nMohon segera diproses ya! Terima kasih.`;
-
-      // 3. Kirim ke Chat
-      await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message }),
-      });
-
-      // 4. Tampilkan Status Sukses DULU (Penting agar user tau)
-      setIsSuccess(true);
-      
-      // 5. Baru bersihkan keranjang & Redirect setelah jeda singkat
-      setTimeout(() => {
-        clearCart();
-        router.push("/chat"); 
-      }, 2000); // Jeda 2 detik agar user sempat baca "Berhasil"
 
     } catch (error) {
       console.error(error);
       alert("Terjadi kesalahan saat checkout. Coba lagi.");
-      setIsCheckingOut(false); // Matikan loading hanya jika error
+      setIsCheckingOut(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
-      {/* Navbar */}
       <nav className="sticky top-0 z-50 w-full bg-white/95 backdrop-blur-md border-b px-4 py-4 shadow-sm">
         <div className="container mx-auto flex items-center gap-4">
           <Link href="/menu" className="flex items-center gap-2 text-slate-600 hover:text-primary transition-colors">
@@ -100,20 +77,7 @@ export default function CartPage() {
       </nav>
 
       <main className="container mx-auto px-4 py-8 max-w-3xl">
-        {/* KONDISI 1: Jika Sukses Checkout */}
-        {isSuccess ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center space-y-6 animate-in fade-in zoom-in duration-300">
-            <div className="bg-green-100 p-6 rounded-full">
-              <CheckCircle className="h-16 w-16 text-green-600" />
-            </div>
-            <div>
-              <h3 className="text-2xl font-bold text-slate-800">Pesanan Berhasil Dibuat!</h3>
-              <p className="text-slate-500 mt-2">Mengalihkan Anda ke halaman chat...</p>
-            </div>
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-        ) : items.length === 0 ? (
-          // KONDISI 2: Jika Keranjang Kosong (Belum belanja)
+        {items.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
             <div className="bg-slate-100 p-8 rounded-full animate-pulse">
               <ShoppingBag className="h-16 w-16 text-slate-300" />
@@ -125,7 +89,6 @@ export default function CartPage() {
             </Link>
           </div>
         ) : (
-          // KONDISI 3: Ada Barang (Tampilkan List)
           <div className="space-y-6">
             <div className="space-y-4">
               {items.map((item) => (
@@ -135,29 +98,19 @@ export default function CartPage() {
                       {item.image ? (
                         <Image src={item.image} alt={item.name} fill className="object-cover" />
                       ) : (
-                        <div className="flex items-center justify-center h-full text-slate-300">
-                          <ShoppingBag className="h-8 w-8" />
-                        </div>
+                        <div className="flex items-center justify-center h-full text-slate-300"><ShoppingBag className="h-8 w-8" /></div>
                       )}
                     </div>
-
                     <div className="flex-1 min-w-0">
                       <h3 className="font-bold text-slate-900 truncate">{item.name}</h3>
                       <p className="text-primary font-semibold text-sm">{formatRupiah(item.price)}</p>
                     </div>
-
                     <div className="flex items-center gap-3 bg-slate-50 rounded-full p-1 border border-slate-200">
-                      <button 
-                        onClick={() => decreaseQuantity(item.id)}
-                        className="h-8 w-8 flex items-center justify-center rounded-full bg-white text-slate-600 shadow-sm hover:text-primary active:scale-90 transition-all"
-                      >
+                      <button onClick={() => decreaseQuantity(item.id)} className="h-8 w-8 flex items-center justify-center rounded-full bg-white text-slate-600 shadow-sm hover:text-primary active:scale-90 transition-all">
                         {item.quantity === 1 ? <Trash2 className="h-4 w-4 text-red-500" /> : <Minus className="h-4 w-4" />}
                       </button>
                       <span className="font-bold text-slate-900 w-4 text-center text-sm">{item.quantity}</span>
-                      <button 
-                        onClick={() => addToCart(item)}
-                        className="h-8 w-8 flex items-center justify-center rounded-full bg-primary text-white shadow-sm hover:bg-primary/90 active:scale-90 transition-all"
-                      >
+                      <button onClick={() => addToCart(item)} className="h-8 w-8 flex items-center justify-center rounded-full bg-primary text-white shadow-sm hover:bg-primary/90 active:scale-90 transition-all">
                         <Plus className="h-4 w-4" />
                       </button>
                     </div>
@@ -173,25 +126,11 @@ export default function CartPage() {
                   <span className="text-primary">{formatRupiah(totalPrice)}</span>
                 </div>
                 <div className="flex gap-3">
-                  <Button 
-                    variant="outline" 
-                    onClick={clearCart}
-                    disabled={isCheckingOut || isSuccess}
-                    className="flex-1 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 rounded-xl"
-                  >
+                  <Button variant="outline" onClick={clearCart} disabled={isCheckingOut} className="flex-1 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 rounded-xl">
                     <Trash2 className="h-4 w-4 mr-2" /> Kosongkan
                   </Button>
-                  
-                  <Button 
-                    onClick={handleCheckout}
-                    disabled={isCheckingOut || isSuccess}
-                    className="flex-[2] bg-primary hover:bg-primary/90 text-white rounded-xl shadow-lg shadow-primary/20"
-                  >
-                    {isCheckingOut ? (
-                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Memproses...</>
-                    ) : (
-                      <><MessageCircle className="h-4 w-4 mr-2" /> Konfirmasi & Chat</>
-                    )}
+                  <Button onClick={handleCheckout} disabled={isCheckingOut} className="flex-[2] bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-lg shadow-blue-600/20">
+                    {isCheckingOut ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Memproses...</> : <><CreditCard className="h-4 w-4 mr-2" /> Bayar Sekarang</>}
                   </Button>
                 </div>
               </CardContent>

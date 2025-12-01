@@ -1,44 +1,41 @@
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { getServerSession } from "next-auth"; 
-import { authOptions } from "@/app/api/auth/[...nextauth]/route"; 
+import { authOptions } from "../auth/[...nextauth]/route"; 
 import { beamsClient } from "@/lib/beams"; 
+import { Xendit } from 'xendit-node'; // 1. Import Xendit
 
 const prisma = new PrismaClient();
+// 2. Inisialisasi Xendit Client
+const xenditClient = new Xendit({
+  secretKey: process.env.XENDIT_SECRET_KEY!,
+});
 
-// --- BARU: GET PESANAN SAYA (History) ---
+// --- GET PESANAN SAYA (Tetap Sama) ---
 export async function GET(request: Request) {
   try {
     const session = await getServerSession(authOptions);
+    
     if (!session || !session.user) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-    // Ambil pesanan milik user yang sedang login saja
     const myOrders = await prisma.order.findMany({
-      where: {
-        userId: session.user.id
-      },
-      orderBy: {
-        createdAt: 'desc' // Yang terbaru di atas
-      },
+      where: { userId: session.user.id },
+      orderBy: { createdAt: 'desc' },
       include: {
-        items: {
-          include: {
-            menu: true // Sertakan detail menu (nama, gambar)
-          }
-        }
+        items: { include: { menu: true } },
+        payment: true // Sertakan info pembayaran
       }
     });
 
     return NextResponse.json(myOrders);
   } catch (error) {
-    console.error("Get Order Error:", error);
     return NextResponse.json({ message: "Gagal mengambil data pesanan" }, { status: 500 });
   }
 }
 
-// --- POST (TETAP SAMA SEPERTI SEBELUMNYA) ---
+// --- POST BUAT PESANAN & INVOICE XENDIT ---
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -53,7 +50,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Keranjang kosong" }, { status: 400 });
     }
 
-    const newOrder = await prisma.$transaction(async (tx) => {
+    // 3. Mulai Transaksi Database
+    const result = await prisma.$transaction(async (tx) => {
+      // A. Buat Order
       const order = await tx.order.create({
         data: {
           userId: session.user.id,
@@ -62,6 +61,7 @@ export async function POST(request: Request) {
         },
       });
 
+      // B. Buat Item Detail
       for (const item of items) {
         await tx.orderItem.create({
           data: {
@@ -73,17 +73,43 @@ export async function POST(request: Request) {
           },
         });
       }
-      return order;
-    });
 
-    // --- KIRIM NOTIFIKASI BEAMS KE ADMIN ---
+      // C. Buat Invoice Xendit
+      const xenditInvoice = await xenditClient.Invoice.createInvoice({
+        data: {
+          externalId: order.id,
+          amount: totalPrice,
+          payerEmail: session.user.email || "customer@dapuradida.com",
+          description: `Pembayaran Order #${order.id.slice(-5)} - Dapur Adida`,
+          invoiceDuration: 86400, // 24 Jam
+          currency: "IDR",
+        }
+      });
+
+      // D. Simpan Data Pembayaran ke Tabel Payment
+      await tx.payment.create({
+        data: {
+          orderId: order.id,
+          amount: totalPrice,
+          status: "PENDING",
+          xenditInvoiceId: xenditInvoice.id,
+          paymentUrl: xenditInvoice.invoiceUrl, // Simpan Link Pembayaran
+        }
+      });
+
+      return { order, xenditInvoice };
+    });
+    
+    console.log("✅ Order & Invoice Xendit Berhasil:", result.order.id);
+
+    // 4. Notifikasi ke Admin (Bahwa ada Invoice Baru dibuat)
     try {
       await beamsClient.publishToInterests(["admin-global"], {
         web: {
           notification: {
-            title: "Pesanan Baru Masuk! 💰",
-            body: `${session.user.name} baru saja memesan senilai Rp ${totalPrice.toLocaleString()}`,
-            deep_link: "http://localhost:3000/admin/orders", // Arahkan admin ke halaman order
+            title: "Tagihan Baru Dibuat 💳",
+            body: `${session.user.name} membuat pesanan Rp ${totalPrice.toLocaleString()}. Menunggu pembayaran.`,
+            deep_link: "http://localhost:3000/admin/orders",
           },
         },
       });
@@ -91,8 +117,13 @@ export async function POST(request: Request) {
       console.error("Gagal kirim notif Beams:", beamError);
     }
 
+    // 5. Kembalikan URL Pembayaran ke Frontend
     return NextResponse.json(
-      { message: "Order berhasil", orderId: newOrder.id },
+      { 
+        message: "Order berhasil", 
+        orderId: result.order.id,
+        paymentUrl: result.xenditInvoice.invoiceUrl // Kirim URL ini agar frontend bisa redirect
+      },
       { status: 201 }
     );
 
