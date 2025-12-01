@@ -1,11 +1,10 @@
-import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { beamsClient } from "@/lib/beams";
+import { prisma } from "@/lib/prisma";
+import { pusherServer } from "@/lib/pusher";
 import { getServerSession } from "next-auth";
-import { authOptions } from "../auth/[...nextauth]/route";
-import { pusherServer } from "@/lib/pusher"; 
-import { beamsClient } from "@/lib/beams"; 
+import { NextResponse } from "next/server";
+import { authOptions } from "@/lib/auth";
 
-const prisma = new PrismaClient();
 
 // GET: Ambil riwayat chat
 export async function GET(request: Request) {
@@ -86,8 +85,8 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { message, targetUserId } = body;
 
-    const senderId = session.user.id;
-    const senderRole = session.user.role;
+    const senderId = session?.user?.id;
+    const senderRole = session?.user?.role;
     let receiverId = "";
 
     // Logika Penerima

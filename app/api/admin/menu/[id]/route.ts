@@ -1,9 +1,8 @@
-import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
-import { authOptions } from "../../../auth/[...nextauth]/route"; // 3x mundur (Pas)
+import { NextResponse } from "next/server";
+import { authOptions } from "@/lib/auth";
 
-const prisma = new PrismaClient();
 
 // PATCH: Untuk Edit Menu (Update)
 export async function PATCH(
@@ -17,7 +16,7 @@ export async function PATCH(
   const session = await getServerSession(authOptions);
 
   // 3. Proteksi: Hanya ADMIN yang boleh akses
-  if (!session || session.user.role !== "ADMIN") {
+  if (!session || session?.user?.role !== "ADMIN") {
     return NextResponse.json({ message: "Akses ditolak! Khusus Admin." }, { status: 403 });
   }
 
@@ -53,7 +52,7 @@ export async function DELETE(
   const session = await getServerSession(authOptions);
 
   // 2. Proteksi: Hanya ADMIN
-  if (!session || session.user.role !== "ADMIN") {
+  if (!session || session?.user?.role !== "ADMIN") {
     return NextResponse.json({ message: "Akses ditolak! Khusus Admin." }, { status: 403 });
   }
 

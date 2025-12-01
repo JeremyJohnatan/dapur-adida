@@ -1,11 +1,10 @@
+import { beamsClient } from "@/lib/beams";
+import { prisma } from "@/lib/prisma";
+import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-import { getServerSession } from "next-auth"; 
-import { authOptions } from "../auth/[...nextauth]/route"; 
-import { beamsClient } from "@/lib/beams"; 
 import { Xendit } from 'xendit-node'; // 1. Import Xendit
+import { authOptions } from "@/lib/auth";
 
-const prisma = new PrismaClient();
 // 2. Inisialisasi Xendit Client
 const xenditClient = new Xendit({
   secretKey: process.env.XENDIT_SECRET_KEY!,
@@ -55,7 +54,7 @@ export async function POST(request: Request) {
       // A. Buat Order
       const order = await tx.order.create({
         data: {
-          userId: session.user.id,
+          userId: session?.user?.id,
           totalAmount: totalPrice,
           status: "PENDING",
         },
@@ -79,7 +78,7 @@ export async function POST(request: Request) {
         data: {
           externalId: order.id,
           amount: totalPrice,
-          payerEmail: session.user.email || "customer@dapuradida.com",
+          payerEmail: session?.user?.email || "customer@dapuradida.com",
           description: `Pembayaran Order #${order.id.slice(-5)} - Dapur Adida`,
           invoiceDuration: 86400, // 24 Jam
           currency: "IDR",

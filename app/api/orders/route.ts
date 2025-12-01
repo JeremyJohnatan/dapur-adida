@@ -1,11 +1,10 @@
+import { beamsClient } from "@/lib/beams";
+import { prisma } from "@/lib/prisma";
+import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-import { getServerSession } from "next-auth"; 
-import { authOptions } from "../auth/[...nextauth]/route"; 
-import { beamsClient } from "@/lib/beams"; 
-import { Xendit } from 'xendit-node'; 
+import { Xendit } from 'xendit-node';
+import { authOptions } from "@/lib/auth";
 
-const prisma = new PrismaClient();
 
 const apiKey = process.env.XENDIT_SECRET_KEY;
 const xenditClient = new Xendit({ secretKey: apiKey || "" });
@@ -56,7 +55,7 @@ export async function POST(request: Request) {
     const result = await prisma.$transaction(async (tx) => {
       const order = await tx.order.create({
         data: {
-          userId: session.user.id,
+          userId: session?.user?.id,
           totalAmount: amountNumber,
           status: "PENDING",
         },

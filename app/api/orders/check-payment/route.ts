@@ -1,11 +1,10 @@
-import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import { xenditClient } from "@/lib/xendit";
 import { getServerSession } from "next-auth";
-import { authOptions } from "../../auth/[...nextauth]/route";
-import { Xendit } from 'xendit-node';
+import { NextResponse } from "next/server";
+import { authOptions } from "@/lib/auth";
 
-const prisma = new PrismaClient();
-const xenditClient = new Xendit({ secretKey: process.env.XENDIT_SECRET_KEY! });
+
 
 export async function POST(request: Request) {
   try {
