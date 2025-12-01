@@ -1,5 +1,11 @@
 {
   "compilerOptions": {
+    "compilerOptions": {
+      "baseUrl": ".",
+      "paths": {
+        "@/*": ["./src/*"] // Atau ["./app/*"] atau ["./*"] tergantung struktur foldermu
+      }
+    }
     "target": "ES2017",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,

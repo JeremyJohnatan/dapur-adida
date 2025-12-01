@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { getServerSession } from "next-auth"; 
-import { authOptions } from "../auth/[...nextauth]/route"; 
+import { authOptions } from "@/lib/auth";
 import { beamsClient } from "@/lib/beams"; 
 import { Xendit } from 'xendit-node'; // 1. Import Xendit
 
