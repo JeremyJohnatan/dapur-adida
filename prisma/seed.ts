@@ -1,12 +1,14 @@
 import { PrismaClient } from '@prisma/client';
+import { hash } from 'bcrypt'; // Import bcrypt untuk hash password
 
 const prisma = new PrismaClient();
 
 async function main() {
-  // Hapus data lama jika ada (biar tidak duplikat saat di-run ulang)
+  // --- 1. SEED MENU (Data Lama) ---
+  
+  // Hapus data menu lama agar bersih (Opsional, hati-hati jika production)
   await prisma.menu.deleteMany();
 
-  // Data Menu Dapur Adida
   const menus = [
     {
       name: "Ayam Bakar saja",
@@ -52,15 +54,38 @@ async function main() {
     },
   ];
 
-  console.log('Mulai mengisi data menu...');
+  console.log('🍽️ Mulai mengisi data menu...');
 
   for (const menu of menus) {
     await prisma.menu.create({
       data: menu,
     });
   }
-
   console.log('✅ Sukses mengisi database dengan Menu!');
+
+
+  // --- 2. SEED ADMIN USER (Baru) ---
+  
+  console.log('👤 Membuat akun Admin...');
+  
+  const hashedPassword = await hash('123', 10);
+
+  // Pakai upsert: Jika admin sudah ada, dia tidak akan bikin baru (biar gak error unique constraint)
+  const admin = await prisma.user.upsert({
+    where: { username: 'admin' }, // Cek berdasarkan username unique
+    update: {}, // Tidak ada yg diupdate jika sudah ada
+    create: {
+      fullName: 'Super Admin Dapur Adida',
+      username: 'admin',
+      email: 'admin@dapuradida.com',
+      password: hashedPassword,
+      role: 'ADMIN', // SET ROLE ADMIN DISINI
+      phoneNumber: '081234567890',
+      address: 'Kantor Pusat Dapur Adida, Jakarta',
+    },
+  });
+
+  console.log(`✅ Sukses membuat Admin: ${admin.username} (Password: 123)`);
 }
 
 main()
