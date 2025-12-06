@@ -41,7 +41,7 @@ export default function AdminDashboard() {
   if (loading) return <div className="flex justify-center p-20"><Loader2 className="animate-spin text-primary h-10 w-10" /></div>;
 
   return (
-    <div className="space-y-8 pb-10">
+    <div className="space-y-8 p-8 pb-10">
       <div>
         <h1 className="text-3xl font-bold text-slate-800">Dashboard</h1>
         <p className="text-slate-500">Ringkasan performa bisnis Dapur Adida.</p>

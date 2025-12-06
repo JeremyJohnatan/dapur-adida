@@ -185,7 +185,7 @@ export default function AdminMenuPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-8">
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
         <h1 className="text-2xl font-bold text-slate-800">Manajemen Menu</h1>
         

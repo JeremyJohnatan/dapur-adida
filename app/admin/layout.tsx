@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useSession } from "next-auth/react";
+import Image from "next/image"; // 1. Import Image
+import { useSession, signOut } from "next-auth/react"; 
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { 
@@ -26,7 +27,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   useEffect(() => {
     if (status === "loading") return;
     if (!session || session?.user?.role !== "ADMIN") {
-      router.push("/"); // Tendang user biasa ke Home
+      router.push("/"); 
     }
   }, [session, status, router]);
 
@@ -42,16 +43,25 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: "Dashboard", icon: <LayoutDashboard size={20} />, href: "/admin" },
     { name: "Pesanan Masuk", icon: <ShoppingBag size={20} />, href: "/admin/orders" },
     { name: "Manajemen Menu", icon: <Utensils size={20} />, href: "/admin/menu" },
-    { name: "Live Chat", icon: <MessageSquare size={20} />, href: "/chat" }, // Chat pakai halaman yg sudah ada
+    { name: "Live Chat", icon: <MessageSquare size={20} />, href: "/admin/chat" }, 
   ];
 
   const SidebarContent = () => (
     <>
-      <div className="p-6 border-b flex items-center gap-2">
-        <div className="bg-primary/10 p-2 rounded-lg">
-          <ChefHat className="h-6 w-6 text-primary" />
-        </div>
-        <span className="font-extrabold text-xl text-slate-800">Admin Panel</span>
+      {/* LOGO DESKTOP - SEKARANG PAKAI GAMBAR */}
+      <div className="p-6 border-b">
+        <Link href="/admin" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+          <div className="relative h-10 w-10 overflow-hidden rounded-lg border border-slate-100">
+             <Image 
+               src= "/logo_dapuradida.jpeg"
+               alt="Logo Admin" 
+               fill
+               className="object-cover"
+               sizes="40px"
+             />
+          </div>
+          <span className="font-extrabold text-xl text-slate-800">Admin Panel</span>
+        </Link>
       </div>
 
       <nav className="flex-1 p-4 space-y-2">
@@ -73,8 +83,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </nav>
 
       <div className="p-4 border-t">
-        <Button variant="outline" className="w-full justify-start text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => router.push("/")}>
-          <LogOut size={18} className="mr-2" /> Keluar ke Home
+        <Button variant="outline" className="w-full justify-start text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => signOut({ callbackUrl: "/" })}>
+          <LogOut size={18} className="mr-2" /> Logout
         </Button>
       </div>
     </>
@@ -84,12 +94,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <div className="flex min-h-screen bg-slate-100 font-sans text-slate-900">
       {/* MOBILE HEADER */}
       <div className="md:hidden fixed top-0 left-0 right-0 bg-white border-b shadow-sm z-20 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="bg-primary/10 p-2 rounded-lg">
-            <ChefHat className="h-5 w-5 text-primary" />
+        
+        {/* LOGO MOBILE - PAKAI GAMBAR JUGA */}
+        <Link href="/admin" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+          <div className="relative h-8 w-8 overflow-hidden rounded-lg border border-slate-100">
+             <Image 
+               src="/logo_dapuradida.JPG" 
+               alt="Logo Admin" 
+               fill
+               className="object-cover"
+               sizes="32px"
+             />
           </div>
           <span className="font-extrabold text-lg text-slate-800">Admin Panel</span>
-        </div>
+        </Link>
+
         <Button 
           variant="ghost" 
           size="icon"
@@ -122,7 +141,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </aside>
 
       {/* CONTENT AREA */}
-      <main className="flex-1 md:ml-64 p-8 mt-16 md:mt-0">
+      <main className="flex-1 md:ml-64 mt-16 md:mt-0">
         {children}
       </main>
     </div>
