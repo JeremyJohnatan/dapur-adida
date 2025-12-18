@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { signIn, getSession } from 'next-auth/react'; // Tambah getSession
+import { signIn, getSession } from 'next-auth/react'; 
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -35,15 +35,12 @@ export default function LoginPage() {
       setError("Username atau Password salah!");
       setIsLoading(false);
     } else {
-      // 2. Login Sukses! Sekarang cek Role-nya apa?
-      // Kita panggil session terbaru untuk melihat data user
+      // 2. Login Sukses! Cek Role
       const session = await getSession();
       
       if (session?.user?.role === "ADMIN") {
-        // Jika ADMIN -> Langsung ke Dashboard
         router.push("/admin");
       } else {
-        // Jika CUSTOMER -> Ke Landing Page
         router.push("/");
       }
       
@@ -91,7 +88,9 @@ export default function LoginPage() {
               <Input id="password" name="password" type="password" required disabled={isLoading} />
             </div>
           </CardContent>
-          <CardFooter className="flex flex-col gap-3">
+
+          {/* PERBAIKAN: Ditambahkan 'pt-6' agar ada jarak dengan input password */}
+          <CardFooter className="flex flex-col gap-3 pt-4">
             <Button className="w-full bg-slate-900 hover:bg-slate-800" disabled={isLoading}>
               {isLoading ? (
                 <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Masuk...</>

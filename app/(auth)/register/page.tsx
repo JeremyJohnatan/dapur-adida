@@ -99,7 +99,7 @@ export default function RegisterPage() {
             </div>
           </CardContent>
           
-          <CardFooter className="flex flex-col gap-3">
+          <CardFooter className="flex flex-col gap-3 pt-4">
             <Button className="w-full bg-slate-900 hover:bg-slate-800" disabled={isLoading}>
               {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Daftar Sekarang"}
             </Button>

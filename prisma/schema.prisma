@@ -47,8 +47,6 @@ model User {
   receivedChats Chat[]    @relation("ReceivedChats")
 }
 
-// ... (Sisa model Menu, Order, dll TETAP SAMA seperti sebelumnya, jangan dihapus)
-// Copy-paste saja model Order, Menu, Payment, Chat dari pesan sebelumnya di bawah ini
 model Menu {
   id          String      @id @default(cuid())
   name        String
