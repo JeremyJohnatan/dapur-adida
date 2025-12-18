@@ -85,7 +85,7 @@ export default function LoginPage() {
               <div className="flex items-center">
                 <Label htmlFor="password">Kata Sandi</Label>
               </div>
-              <Input id="password" name="password" type="password" required disabled={isLoading} />
+              <Input id="password" name="password" type="password" placeholder="Kata Sandi Anda" required disabled={isLoading} />
             </div>
           </CardContent>
 
