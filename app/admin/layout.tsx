@@ -99,7 +99,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <Link href="/admin" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
           <div className="relative h-8 w-8 overflow-hidden rounded-lg border border-slate-100">
              <Image 
-               src="/logo_dapuradida.JPG" 
+               src="/logo_dapuradida.jpeg 
                alt="Logo Admin" 
                fill
                className="object-cover"

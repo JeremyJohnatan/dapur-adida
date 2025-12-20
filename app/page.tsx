@@ -130,7 +130,7 @@ export default function LandingPage() {
             <Link href="/" className="flex items-center gap-3 group">
               <div className="relative h-10 w-10 md:h-12 md:w-12 overflow-hidden rounded-full border-2 border-primary/20 group-hover:border-primary transition-colors duration-300">
                 <Image 
-                  src="/logo_dapuradida.JPG" 
+                  src="/logo_dapuradida.jpeg" 
                   alt="Logo Dapur Adida"
                   fill
                   className="object-cover"
@@ -397,7 +397,7 @@ export default function LandingPage() {
               <div className="flex items-center gap-3 mb-6 text-white">
                 <div className="relative h-12 w-12 overflow-hidden rounded-full border-2 border-slate-600">
                    <Image 
-                    src="/logo_dapuradida.JPG" 
+                    src="/logo_dapuradida.jpeg" 
                     alt="Logo Footer"
                     fill
                     className="object-cover"

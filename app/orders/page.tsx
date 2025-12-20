@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react"; // Tambah useCallback
+import { useEffect, useState, useCallback } from "react"; 
 import Link from "next/link";
 import Image from "next/image";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext"; 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { 
@@ -24,6 +24,18 @@ import {
   CreditCard, 
   RefreshCcw 
 } from "lucide-react";
+
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface OrderItem {
   id: string;
@@ -59,7 +71,7 @@ export default function OrderHistoryPage() {
     if (status === "unauthenticated") router.push("/login");
   }, [status, router]);
 
-  // --- 1. FUNGSI FETCH DATA (Dibungkus useCallback agar stabil) ---
+  // --- FUNGSI FETCH DATA ---
   const fetchOrders = useCallback(async () => {
     if (session?.user) {
       try {
@@ -76,14 +88,13 @@ export default function OrderHistoryPage() {
     }
   }, [session]);
 
-  // Panggil fetch saat pertama kali load
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
 
-  // --- 2. FUNGSI CEK STATUS (Bisa Manual / Otomatis) ---
+  // --- FUNGSI CEK STATUS ---
   const handleCheckPayment = async (orderId: string, manual: boolean = true) => {
-    if (manual) setCheckingId(orderId); // Tampilkan loading hanya jika diklik manual
+    if (manual) setCheckingId(orderId); 
 
     try {
       const res = await fetch("/api/orders/check-payment", {
@@ -95,11 +106,9 @@ export default function OrderHistoryPage() {
       const data = await res.json();
       
       if (data.status === "PAID") {
-        // Jika berhasil bayar
         if (manual) alert("✅ Pembayaran Berhasil! Pesanan sedang diproses.");
-        fetchOrders(); // Refresh data otomatis agar status di layar berubah
+        fetchOrders(); 
       } else {
-        // Jika belum bayar
         if (manual) alert("⚠️ Pembayaran belum terkonfirmasi. Pastikan Anda sudah menyelesaikan pembayaran.");
       }
     } catch (error) {
@@ -109,20 +118,17 @@ export default function OrderHistoryPage() {
     }
   };
 
-  // --- 3. AUTO CHECK (Jalan Sekali saat Data Masuk) ---
+  // --- AUTO CHECK ---
   useEffect(() => {
     if (orders.length > 0) {
-      // Cari pesanan terbaru yang masih PENDING
       const latestPendingOrder = orders.find(o => o.status === "PENDING");
-      
       if (latestPendingOrder) {
-        // Cek diam-diam (Silent Check)
         console.log("Auto-checking payment for:", latestPendingOrder.id);
         handleCheckPayment(latestPendingOrder.id, false);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orders.length]); // Hanya jalan jika jumlah order berubah/termuat
+  }, [orders.length]); 
 
   const formatRupiah = (price: string | number) => {
     return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(Number(price));
@@ -144,32 +150,77 @@ export default function OrderHistoryPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
-      {/* Navbar */}
+      
+      {/* ===== NAVBAR (Update Sesuai Request) ===== */}
       <nav className="sticky top-0 z-50 w-full bg-white/95 backdrop-blur-md border-b px-4 py-4 shadow-sm">
-        <div className="container mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link href="/" className="flex items-center gap-2 text-slate-600 hover:text-primary transition-colors">
+        <div className="container mx-auto flex items-center justify-center relative h-10"> {/* h-10 agar tinggi konsisten */}
+          
+          {/* KIRI: Logo / Back Button */}
+          <div className="absolute left-0 flex items-center">
+             <Link href="/" className="flex items-center gap-2 text-slate-600 hover:text-primary transition-colors">
               <ArrowLeft className="h-5 w-5" />
               <span className="font-medium hidden sm:block">Kembali ke Home</span>
             </Link>
-            <h1 className="text-xl font-bold text-primary">Pesanan Saya</h1>
           </div>
 
-          <div className="flex items-center gap-2 md:gap-4">
-             <Link href="/chat" className="relative p-2 hover:bg-slate-100 rounded-full transition-colors" title="Chat Admin">
-                <MessageCircle className="h-6 w-6 text-slate-600 hover:text-primary" />
-             </Link>
-             <Link href="/cart" className="relative p-2 hover:bg-slate-100 rounded-full transition-colors">
-                <ShoppingCart className="h-6 w-6 text-slate-600 hover:text-primary" />
-                {totalItems > 0 && <span className="absolute top-0 right-0 bg-primary text-white text-[10px] font-bold h-4 w-4 rounded-full flex items-center justify-center shadow-sm">{totalItems}</span>}
-             </Link>
-             <div className="hidden md:flex items-center gap-2 text-sm font-bold text-primary bg-primary/5 px-4 py-2 rounded-full border border-primary/10">
-                <User className="h-4 w-4" />
-                <span className="capitalize truncate max-w-[100px]">{session?.user?.name || "Kakak"}</span>
-             </div>
-             <Button variant="destructive" size="sm" onClick={() => signOut({ callbackUrl: "/" })} className="rounded-full w-9 h-9 p-0 md:w-auto md:px-4 md:h-9 shadow-md hover:shadow-lg transition-all">
-                <LogOut className="h-4 w-4 md:mr-2" /> <span className="hidden md:inline">Keluar</span>
-             </Button>
+          {/* TENGAH: Judul Halaman */}
+          <h1 className="text-xl font-bold text-primary">Pesanan Saya</h1>
+
+          {/* KANAN: Menu User (Tanpa Tombol 'Pesanan' karena ini halaman pesanan) */}
+          <div className="absolute right-0 flex items-center gap-2 md:gap-3">
+            
+            {/* 1. ICON CHAT */}
+            <Link href="/chat" className="relative p-2 hover:bg-slate-100 rounded-full transition-colors hidden sm:block" title="Chat Admin">
+              <MessageCircle className="h-5 w-5 md:h-6 md:w-6 text-slate-600 hover:text-primary" />
+            </Link>
+
+            {/* 2. ICON KERANJANG */}
+            <Link href="/cart" className="relative p-2 hover:bg-slate-100 rounded-full transition-colors mr-1">
+              <ShoppingCart className="h-5 w-5 md:h-6 md:w-6 text-slate-600 hover:text-primary" />
+              {totalItems > 0 && (
+                <span className="absolute top-0 right-0 bg-primary text-white text-[10px] font-bold h-4 w-4 rounded-full flex items-center justify-center shadow-sm animate-in zoom-in">
+                  {totalItems}
+                </span>
+              )}
+            </Link>
+
+            {/* 3. USER PROFILE */}
+            <div className="hidden md:flex items-center gap-2 text-sm font-bold text-slate-600 bg-slate-100 px-4 py-2 rounded-full">
+              <User className="h-4 w-4" />
+              <span className="capitalize truncate max-w-[100px]">{session?.user?.name || "Kakak"}</span>
+            </div>
+            
+            {/* 4. TOMBOL KELUAR (Dengan Konfirmasi) */}
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="rounded-full text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all"
+                  title="Keluar"
+                >
+                  <LogOut className="h-5 w-5" /> 
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Konfirmasi Keluar</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Apakah Anda yakin ingin keluar dari akun?
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Batal</AlertDialogCancel>
+                  <AlertDialogAction 
+                    onClick={() => signOut({ callbackUrl: "/" })}
+                    className="bg-red-600 hover:bg-red-700 focus:ring-red-600 text-white"
+                  >
+                    Ya, Keluar
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
           </div>
         </div>
       </nav>
@@ -227,11 +278,10 @@ export default function OrderHistoryPage() {
                     {/* TOMBOL Cek Status & Bayar (Hanya Muncul Jika PENDING) */}
                     {order.status === "PENDING" && order.payment?.paymentUrl && (
                       <>
-                        {/* Tombol Cek Status Manual (Jaga-jaga) */}
                         <Button 
                           size="sm" 
                           variant="secondary"
-                          onClick={() => handleCheckPayment(order.id, true)} // True = Manual Mode (Muncul Alert)
+                          onClick={() => handleCheckPayment(order.id, true)} 
                           disabled={checkingId === order.id}
                           className="text-xs h-8 bg-slate-100 hover:bg-slate-200 text-slate-700"
                         >
