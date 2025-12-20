@@ -17,6 +17,15 @@ export default function CartPage() {
   
   const [isCheckingOut, setIsCheckingOut] = useState(false);
 
+  // --- 1. STATE UNTUK ANIMASI BUMP (Baru Ditambahkan) ---
+  const [animatingId, setAnimatingId] = useState<string | null>(null);
+
+  // Fungsi helper untuk memicu animasi
+  const triggerAnimation = (id: string) => {
+    setAnimatingId(id);
+    setTimeout(() => setAnimatingId(null), 200); // Animasi berjalan 200ms
+  };
+
   const formatRupiah = (price: number) => {
     return new Intl.NumberFormat("id-ID", {
       style: "currency",
@@ -67,12 +76,18 @@ export default function CartPage() {
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
       <nav className="sticky top-0 z-50 w-full bg-white/95 backdrop-blur-md border-b px-4 py-4 shadow-sm">
-        <div className="container mx-auto flex items-center gap-4">
-          <Link href="/menu" className="flex items-center gap-2 text-slate-600 hover:text-primary transition-colors">
+        {/* UBAH DI SINI: Tambahkan 'relative' dan 'justify-center', hapus 'gap-4' */}
+        <div className="container mx-auto flex items-center justify-center relative">
+          
+          {/* UBAH DI SINI: Tambahkan 'absolute left-0' agar tombol menempel di kiri tanpa mendorong teks tengah */}
+          <Link href="/menu" className="absolute left-0 flex items-center gap-2 text-slate-600 hover:text-primary transition-colors">
             <ArrowLeft className="h-5 w-5" />
             <span className="font-medium hidden sm:block">Lanjut Belanja</span>
           </Link>
+          
+          {/* Judul sekarang otomatis berada di tengah karena parent menggunakan justify-center */}
           <h1 className="text-xl font-bold text-primary">Keranjang Pesanan</h1>
+        
         </div>
       </nav>
 
@@ -91,8 +106,13 @@ export default function CartPage() {
         ) : (
           <div className="space-y-6">
             <div className="space-y-4">
-              {items.map((item) => (
-                <Card key={item.id} className="overflow-hidden border-none shadow-sm hover:shadow-md transition-shadow bg-white rounded-2xl">
+              {items.map((item, index) => (
+                // Tambahkan animasi 'animate-in' agar item terlihat masuk saat halaman dimuat
+                <Card 
+                  key={item.id} 
+                  className="overflow-hidden border-none shadow-sm hover:shadow-md transition-shadow bg-white rounded-2xl animate-in slide-in-from-bottom-5 fade-in duration-500"
+                  style={{ animationDelay: `${index * 100}ms` }} // Efek muncul bergantian
+                >
                   <CardContent className="p-4 flex items-center gap-4">
                     <div className="relative h-20 w-20 bg-slate-100 rounded-xl overflow-hidden shrink-0">
                       {item.image ? (
@@ -105,21 +125,41 @@ export default function CartPage() {
                       <h3 className="font-bold text-slate-900 truncate">{item.name}</h3>
                       <p className="text-primary font-semibold text-sm">{formatRupiah(item.price)}</p>
                     </div>
+                    
                     <div className="flex items-center gap-3 bg-slate-50 rounded-full p-1 border border-slate-200">
-                      <button onClick={() => decreaseQuantity(item.id)} className="h-8 w-8 flex items-center justify-center rounded-full bg-white text-slate-600 shadow-sm hover:text-primary active:scale-90 transition-all">
+                      
+                      {/* Tombol Kurang */}
+                      <button 
+                        onClick={() => { decreaseQuantity(item.id); triggerAnimation(item.id); }} 
+                        className="h-8 w-8 flex items-center justify-center rounded-full bg-white text-slate-600 shadow-sm hover:text-primary active:scale-90 transition-all"
+                      >
                         {item.quantity === 1 ? <Trash2 className="h-4 w-4 text-red-500" /> : <Minus className="h-4 w-4" />}
                       </button>
-                      <span className="font-bold text-slate-900 w-4 text-center text-sm">{item.quantity}</span>
-                      <button onClick={() => addToCart(item)} className="h-8 w-8 flex items-center justify-center rounded-full bg-primary text-white shadow-sm hover:bg-primary/90 active:scale-90 transition-all">
+                      
+                      {/* --- 2. LOGIKA ANIMASI PADA ANGKA --- */}
+                      <span 
+                        className={`font-bold w-4 text-center text-sm transition-all duration-200 ${
+                          animatingId === item.id ? "scale-150 text-green-600" : "scale-100 text-slate-900"
+                        }`}
+                      >
+                        {item.quantity}
+                      </span>
+                      
+                      {/* Tombol Tambah */}
+                      <button 
+                        onClick={() => { addToCart(item); triggerAnimation(item.id); }} 
+                        className="h-8 w-8 flex items-center justify-center rounded-full bg-primary text-white shadow-sm hover:bg-primary/90 active:scale-90 transition-all"
+                      >
                         <Plus className="h-4 w-4" />
                       </button>
+
                     </div>
                   </CardContent>
                 </Card>
               ))}
             </div>
 
-            <Card className="border-none shadow-lg bg-white rounded-2xl sticky bottom-4">
+            <Card className="border-none shadow-lg bg-white rounded-2xl sticky bottom-4 animate-in slide-in-from-bottom-10 fade-in duration-700">
               <CardContent className="p-6 space-y-4">
                 <div className="flex justify-between items-center text-lg font-bold text-slate-900">
                   <span>Total Pembayaran</span>

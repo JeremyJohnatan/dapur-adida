@@ -4,10 +4,9 @@ import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Send, User, ChefHat, ArrowLeft, MessageSquare, Loader2 } from "lucide-react";
+import { Send, ChefHat, ArrowLeft, Loader2, MessageSquare, Search } from "lucide-react";
 import Link from "next/link";
-import { pusherClient } from "@/lib/pusher"; // Pastikan file lib/pusher.ts sudah ada
+import { pusherClient } from "@/lib/pusher";
 
 interface ChatMessage {
   id: string;
@@ -40,36 +39,32 @@ export default function ChatInterface() {
 
   const isAdmin = session?.user?.role === "ADMIN";
 
-  // Redirect jika belum login
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
   }, [status, router]);
 
-  // --- 1. FETCH DATA AWAL (Hanya Sekali saat Load) ---
+  // --- 1. FETCH DATA AWAL ---
   useEffect(() => {
     if (!session?.user) return;
-
     const fetchInitialData = async () => {
       try {
         if (isAdmin) {
           const resInbox = await fetch("/api/chat?mode=inbox");
           if (resInbox.ok) setInboxList(await resInbox.json());
         } else {
-          // Customer langsung load chat roomnya
           const res = await fetch("/api/chat");
           if (res.ok) setMessages(await res.json());
         }
       } catch (err) {
-        console.error("Gagal load chat:", err);
+        console.error("Error:", err);
       } finally {
         setLoading(false);
       }
     };
-
     fetchInitialData();
   }, [session, isAdmin]);
 
-  // --- 2. FETCH DETAIL CHAT SAAT GANTI ROOM (Khusus Admin) ---
+  // --- 2. FETCH DETAIL CHAT (Admin) ---
   useEffect(() => {
     if (isAdmin && selectedPartnerId) {
       setLoading(true);
@@ -85,29 +80,20 @@ export default function ChatInterface() {
     }
   }, [selectedPartnerId, isAdmin]);
 
-  // --- 3. PUSHER LISTENER (JANTUNG REALTIME) ---
+  // --- 3. PUSHER LISTENER ---
   useEffect(() => {
     if (!session?.user) return;
-
-    // Tentukan Channel ID mana yang harus didengar
     const activeChannelId = isAdmin ? selectedPartnerId : session.user.id;
-    
     if (activeChannelId) {
       const channelName = `chat-${activeChannelId}`;
       const channel = pusherClient.subscribe(channelName);
-
-      // Saat ada pesan baru masuk via Pusher
       channel.bind("new-message", (newChat: ChatMessage) => {
         setMessages((prev) => {
-          // Cek biar gak duplikat
           if (prev.some(msg => msg.id === newChat.id)) return prev;
           return [...prev, newChat];
         });
-        
-        // Auto scroll ke bawah
         setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
       });
-
       return () => {
         channel.unbind_all();
         pusherClient.unsubscribe(channelName);
@@ -115,52 +101,39 @@ export default function ChatInterface() {
     }
   }, [session, selectedPartnerId, isAdmin]);
 
-  // --- 4. PUSHER KHUSUS INBOX ADMIN (Update List Kiri) ---
+  // --- 4. INBOX LISTENER (Admin) ---
   useEffect(() => {
     if (isAdmin) {
       const channel = pusherClient.subscribe("admin-channel");
-      
       channel.bind("new-inbox", (data: any) => {
         setInboxList((prev) => {
-          // Hapus data lama user ini, taruh data baru di paling atas (Top)
           const filtered = prev.filter(item => item.userId !== data.userId);
           return [{
-            userId: data.userId,
-            name: data.name,
-            lastMessage: data.lastMessage,
-            lastTime: data.lastTime,
-            unread: true
+            userId: data.userId, name: data.name, lastMessage: data.lastMessage, lastTime: data.lastTime, unread: true
           }, ...filtered];
         });
       });
-
-      return () => {
-        channel.unbind_all();
-        pusherClient.unsubscribe("admin-channel");
-      };
+      return () => { channel.unbind_all(); pusherClient.unsubscribe("admin-channel"); };
     }
   }, [isAdmin]);
 
-  // Auto scroll saat pertama load
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
   }, [messages]);
 
-  // Kirim Pesan
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // --- LOGIC KIRIM PESAN & SHIFT+ENTER ---
+  const handleSendMessage = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!newMessage.trim()) return;
-
+    
     const tempMessage = newMessage;
-    setNewMessage(""); // Langsung kosongkan input biar terasa cepat
+    setNewMessage(""); 
 
-    // Siapkan Payload
     const payload: any = { message: tempMessage };
     if (isAdmin) {
       if (!selectedPartnerId) return;
       payload.targetUserId = selectedPartnerId;
     }
-
     try {
       await fetch("/api/chat", {
         method: "POST",
@@ -168,93 +141,135 @@ export default function ChatInterface() {
         body: JSON.stringify(payload),
       });
     } catch (error) {
-      console.error("Gagal kirim:", error);
-      alert("Gagal mengirim pesan, cek koneksi internet.");
-      setNewMessage(tempMessage); // Balikin teks kalau gagal
+      setNewMessage(tempMessage); 
     }
   };
 
-  if (status === "loading") return <div className="p-10 text-center animate-pulse">Menyiapkan chat...</div>;
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
 
-  // --- RENDER ADMIN UI ---
+  if (status === "loading") return <div className="flex justify-center items-center h-screen"><Loader2 className="animate-spin" /></div>;
+
+  // ==========================================
+  // UI ADMIN (FIX: H-FULL / CALC HEIGHT)
+  // ==========================================
   if (isAdmin) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row h-screen">
-        {/* Sidebar Inbox */}
-        <div className="w-full md:w-1/3 border-r bg-white flex flex-col h-[40vh] md:h-full">
-          <div className="p-4 border-b bg-primary text-white flex justify-between items-center">
-            <h1 className="font-bold text-lg">Inbox Live</h1>
-            <span className="text-[10px] bg-white/20 px-2 py-1 rounded-full">Pusher Active</span>
+      // FIX DISINI: h-[calc(100vh-2rem)] membuat tingginya full layar dikurangi padding sedikit
+      <div className="flex flex-col md:flex-row w-full h-[calc(100vh-2rem)] bg-white border rounded-lg overflow-hidden shadow-sm">
+        
+        {/* Sidebar Inbox List */}
+        <div className="w-full md:w-80 border-r bg-white flex flex-col">
+          <div className="p-4 border-b bg-slate-50">
+            <h2 className="font-bold text-slate-800 mb-1">Pesan Masuk</h2>
+            <div className="relative">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-slate-400" />
+              <input placeholder="Cari pelanggan..." className="w-full pl-8 pr-3 py-2 text-sm border rounded-md bg-white focus:outline-primary" />
+            </div>
           </div>
+          
           <div className="flex-1 overflow-y-auto">
             {inboxList.length === 0 ? (
-              <p className="text-center text-slate-400 p-8 text-sm">Belum ada pesan masuk.</p>
+              <div className="text-center p-8 text-slate-400 text-sm">Belum ada pesan masuk.</div>
             ) : (
               inboxList.map((item) => (
                 <div 
-                  key={item.userId}
+                  key={item.userId} 
                   onClick={() => setSelectedPartnerId(item.userId)}
-                  className={`p-4 border-b cursor-pointer hover:bg-slate-50 transition-colors ${selectedPartnerId === item.userId ? "bg-slate-100 border-l-4 border-l-primary" : ""}`}
+                  className={`p-4 border-b cursor-pointer transition-colors hover:bg-slate-50 
+                    ${selectedPartnerId === item.userId ? "bg-primary/5 border-l-4 border-l-primary" : "border-l-4 border-l-transparent"}`}
                 >
-                  <div className="flex justify-between mb-1">
-                    <h3 className={`font-bold ${item.unread ? 'text-primary' : 'text-slate-800'}`}>{item.name}</h3>
-                    <span className="text-[10px] text-slate-400">
+                  <div className="flex justify-between items-start mb-1">
+                    <span className={`font-semibold text-sm ${item.unread ? "text-slate-900" : "text-slate-600"}`}>
+                      {item.name}
+                    </span>
+                    <span className="text-[10px] text-slate-400 whitespace-nowrap ml-2">
                       {new Date(item.lastTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
                     </span>
                   </div>
-                  <p className={`text-sm truncate ${item.unread ? 'font-bold text-slate-800' : 'text-slate-500'}`}>{item.lastMessage}</p>
+                  <p className={`text-xs truncate ${item.unread ? "font-bold text-slate-800" : "text-slate-500"}`}>
+                    {item.lastMessage}
+                  </p>
                 </div>
               ))
             )}
           </div>
-          <div className="p-4 border-t">
-            <Link href="/"><Button variant="outline" className="w-full">Home</Button></Link>
-          </div>
         </div>
 
-        {/* Chat Area */}
-        <div className="flex-1 flex flex-col bg-slate-100 h-[60vh] md:h-full">
+        {/* Chat Area (Right Side) */}
+        <div className="flex-1 flex flex-col bg-slate-50 relative">
           {selectedPartnerId ? (
             <>
-              <div className="p-4 bg-white border-b flex items-center gap-3 shadow-sm">
-                <div className="bg-primary/10 p-2 rounded-full"><User className="h-5 w-5 text-primary" /></div>
-                <div>
-                  <h2 className="font-bold text-slate-800">
-                    {inboxList.find(i => i.userId === selectedPartnerId)?.name || "Pelanggan"}
-                  </h2>
-                  <p className="text-xs text-green-600 flex items-center gap-1">● Live Chat</p>
+              {/* Header Chat Room */}
+              <div className="p-4 bg-white border-b flex items-center justify-between shadow-sm z-10 flex-none">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-lg">
+                    {inboxList.find(i => i.userId === selectedPartnerId)?.name.charAt(0)}
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-800">
+                      {inboxList.find(i => i.userId === selectedPartnerId)?.name}
+                    </h3>
+                    <div className="flex items-center gap-1.5">
+                      <span className="block w-2 h-2 rounded-full bg-green-500"></span>
+                      <span className="text-xs text-slate-500">Online</span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div className="flex-1 p-4 overflow-y-auto flex flex-col gap-3">
-                {loading ? (
-                  <div className="flex justify-center mt-10"><Loader2 className="animate-spin text-primary" /></div>
-                ) : (
-                  messages.map((msg) => (
-                    <div key={msg.id} className={`flex ${msg.senderId === session?.user?.id ? "justify-end" : "justify-start"}`}>
-                      <div className={`max-w-[70%] p-3 rounded-2xl text-sm shadow-sm ${msg.senderId === session?.user?.id ? "bg-primary text-white rounded-br-none" : "bg-white border text-slate-800 rounded-bl-none"}`}>
-                        <p>{msg.message}</p>
-                        <p className={`text-[9px] mt-1 text-right ${msg.senderId === session?.user?.id ? "text-white/70" : "text-slate-400"}`}>
-                          {new Date(msg.sentAt).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
-                        </p>
+              {/* Messages Body */}
+              <div className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col gap-3">
+                {messages.map((msg) => (
+                  <div key={msg.id} className={`flex ${msg.senderId === session?.user?.id ? "justify-end" : "justify-start"}`}>
+                    {/* BUBBLE CHAT FIX: break-all & whitespace-pre-wrap */}
+                    <div className={`max-w-[75%] md:max-w-[60%] px-4 py-3 rounded-2xl text-sm shadow-sm break-all whitespace-pre-wrap
+                      ${msg.senderId === session?.user?.id 
+                        ? "bg-primary text-white rounded-br-none" 
+                        : "bg-white border text-slate-800 rounded-bl-none"}`}>
+                      
+                      {msg.message}
+                      
+                      <div className={`text-[10px] mt-1 text-right opacity-70 
+                        ${msg.senderId === session?.user?.id ? "text-white" : "text-slate-400"}`}>
+                        {new Date(msg.sentAt).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
                       </div>
                     </div>
-                  ))
-                )}
+                  </div>
+                ))}
                 <div ref={messagesEndRef} />
               </div>
 
-              <div className="p-4 bg-white border-t">
-                <form onSubmit={handleSendMessage} className="flex gap-2">
-                  <Input value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="Balas pesan..." className="rounded-full bg-slate-50" />
-                  <Button type="submit" size="icon" className="rounded-full bg-primary hover:bg-primary/90"><Send className="h-4 w-4" /></Button>
-                </form>
+              {/* Input Area */}
+              <div className="p-4 bg-white border-t flex-none">
+                <div className="flex items-end gap-2 bg-slate-50 p-2 rounded-xl border focus-within:ring-1 focus-within:ring-primary transition-all">
+                  <textarea 
+                    value={newMessage} 
+                    onChange={(e) => setNewMessage(e.target.value)} 
+                    onKeyDown={handleKeyDown}
+                    placeholder="Ketik pesan... (Shift+Enter untuk baris baru)" 
+                    className="flex-1 bg-transparent border-none focus:ring-0 text-sm resize-none max-h-32 min-h-[40px] py-2 px-1"
+                    rows={1}
+                  />
+                  <Button 
+                    onClick={() => handleSendMessage()} 
+                    size="icon" 
+                    className="rounded-lg bg-primary hover:bg-primary/90 shrink-0 h-10 w-10 mb-0.5"
+                  >
+                    <Send className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
             </>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
+            // State Kosong
+            <div className="flex-1 flex flex-col items-center justify-center text-slate-300 select-none">
               <MessageSquare className="h-16 w-16 mb-4 opacity-20" />
-              <p>Pilih percakapan di sebelah kiri.</p>
+              <p className="text-lg font-medium text-slate-400">Pilih percakapan untuk memulai</p>
             </div>
           )}
         </div>
@@ -262,45 +277,65 @@ export default function ChatInterface() {
     );
   }
 
-  // --- RENDER CUSTOMER UI ---
+  // ==========================================
+  // UI CUSTOMER
+  // ==========================================
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
-      <div className="bg-white border-b p-4 sticky top-0 z-10 flex items-center gap-3 shadow-sm">
-        <Link href="/" className="text-slate-500 hover:bg-slate-100 p-2 rounded-full"><ArrowLeft className="h-5 w-5" /></Link>
-        <div className="bg-primary/10 p-2 rounded-full"><ChefHat className="h-6 w-6 text-primary" /></div>
-        <div>
-          <h1 className="font-bold text-lg text-slate-800">Admin Dapur Adida</h1>
-          <p className="text-xs text-green-600 flex items-center gap-1">● Online (Realtime)</p>
-        </div>
-      </div>
-
-      <div className="flex-1 p-4 overflow-y-auto flex flex-col gap-3 pb-24">
-        {loading ? (
-          <div className="flex justify-center mt-10"><Loader2 className="animate-spin text-primary" /></div>
-        ) : messages.length === 0 ? (
-          <div className="text-center text-slate-400 mt-20">
-            <p className="text-sm">Halo! Ada yang bisa kami bantu?</p>
+    <div className="h-screen w-full bg-slate-200 flex items-center justify-center overflow-hidden">
+      <div className="w-full max-w-md h-[95vh] md:h-[85vh] bg-white md:rounded-2xl shadow-2xl flex flex-col overflow-hidden relative">
+        
+        {/* Header */}
+        <div className="h-16 flex-none bg-white border-b flex items-center px-4 gap-3 shadow-sm z-20">
+          <Link href="/" className="p-2 hover:bg-slate-100 rounded-full"><ArrowLeft className="h-5 w-5 text-slate-600" /></Link>
+          <div className="p-2 bg-primary/10 rounded-full"><ChefHat className="h-5 w-5 text-primary" /></div>
+          <div>
+            <h1 className="font-bold text-slate-800">Admin Dapur</h1>
+            <p className="text-[10px] text-green-600 flex items-center gap-1">● Online</p>
           </div>
-        ) : (
-          messages.map((msg) => (
-            <div key={msg.id} className={`flex ${msg.senderId === session?.user?.id ? "justify-end" : "justify-start"}`}>
-              <div className={`max-w-[80%] p-3 rounded-2xl text-sm shadow-sm ${msg.senderId === session?.user?.id ? "bg-primary text-white rounded-br-none" : "bg-white border text-slate-800 rounded-bl-none"}`}>
-                <p>{msg.message}</p>
-                <p className={`text-[9px] mt-1 text-right ${msg.senderId === session?.user?.id ? "text-white/70" : "text-slate-400"}`}>
-                  {new Date(msg.sentAt).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
-                </p>
-              </div>
-            </div>
-          ))
-        )}
-        <div ref={messagesEndRef} />
-      </div>
+        </div>
 
-      <div className="bg-white border-t p-4 fixed bottom-0 w-full shadow-lg">
-        <form onSubmit={handleSendMessage} className="flex gap-2 container mx-auto max-w-3xl">
-          <Input value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="Tulis pesan..." className="rounded-full bg-slate-50" />
-          <Button type="submit" size="icon" className="rounded-full bg-primary hover:bg-primary/90"><Send className="h-4 w-4" /></Button>
-        </form>
+        {/* Chat Body */}
+        <div className="flex-1 overflow-y-auto p-4 bg-slate-50 flex flex-col gap-3">
+          {loading ? (
+            <div className="mt-10 text-center"><Loader2 className="animate-spin inline text-primary" /></div>
+          ) : messages.length === 0 ? (
+            <div className="flex-1 flex flex-col justify-center items-center text-slate-400">
+               <p>Mulai percakapan...</p>
+            </div>
+          ) : (
+            messages.map((msg) => (
+              <div key={msg.id} className={`flex ${msg.senderId === session?.user?.id ? "justify-end" : "justify-start"}`}>
+                <div className={`max-w-[85%] px-4 py-2.5 rounded-xl text-sm shadow-sm break-all whitespace-pre-wrap
+                  ${msg.senderId === session?.user?.id ? "bg-primary text-white rounded-br-none" : "bg-white border text-slate-800 rounded-bl-none"}`}>
+                  <p>{msg.message}</p>
+                  <p className={`text-[9px] mt-1 text-right opacity-70 ${msg.senderId === session?.user?.id ? "text-white" : "text-slate-400"}`}>
+                    {new Date(msg.sentAt).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+                  </p>
+                </div>
+              </div>
+            ))
+          )}
+          <div ref={messagesEndRef} className="h-1" />
+        </div>
+
+        {/* Input Customer */}
+        <div className="flex-none p-3 bg-white border-t z-20">
+          <div className="flex gap-2 items-end">
+            <textarea 
+              value={newMessage} 
+              onChange={(e) => setNewMessage(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Tulis pesan..." 
+              className="flex-1 rounded-2xl bg-slate-100 border-none p-3 text-sm focus:outline-none focus:ring-1 focus:ring-primary resize-none scrollbar-hide"
+              rows={1}
+              style={{ minHeight: "44px", maxHeight: "120px" }}
+            />
+            <Button onClick={() => handleSendMessage()} size="icon" className="rounded-full bg-primary hover:bg-primary/90 shrink-0 h-11 w-11 mb-[1px]">
+              <Send className="h-5 w-5" />
+            </Button>
+          </div>
+        </div>
+
       </div>
     </div>
   );

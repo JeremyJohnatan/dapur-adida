@@ -6,8 +6,8 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, ArrowLeft, ShoppingCart, ChefHat, Star, Plus } from "lucide-react";
-import { useCart } from "@/context/CartContext"; // 1. Import Hook Cart
+import { Loader2, ArrowLeft, ShoppingCart, ChefHat, Star, Plus, Check, CheckCircle2 } from "lucide-react";
+import { useCart } from "@/context/CartContext";
 
 // Definisikan tipe data Menu
 interface Menu {
@@ -23,8 +23,14 @@ export default function MenuPage() {
   const [menus, setMenus] = useState<Menu[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // 2. Ambil fungsi dari CartContext
   const { addToCart, totalItems } = useCart(); 
+
+  // --- STATE ANIMASI & NOTIFIKASI ---
+  const [isCartBumping, setIsCartBumping] = useState(false);
+  const [addedItems, setAddedItems] = useState<Record<string, boolean>>({});
+  
+  // State untuk Pop-up Notifikasi
+  const [toast, setToast] = useState<{ show: boolean; message: string } | null>(null);
 
   useEffect(() => {
     const fetchMenus = async () => {
@@ -42,6 +48,30 @@ export default function MenuPage() {
     fetchMenus();
   }, []);
 
+  // --- FUNGSI HANDLE ADD TO CART ---
+  const handleAddToCart = (menu: any) => {
+    // 1. Masukkan ke Context
+    addToCart(menu);
+
+    // 2. Tampilkan Pop-up Notifikasi
+    setToast({ show: true, message: `Berhasil menambahkan ${menu.name}!` });
+    
+    // Hilangkan pop-up setelah 2 detik
+    setTimeout(() => {
+      setToast(null);
+    }, 2000);
+
+    // 3. Animasi Ikon Keranjang (Bump)
+    setIsCartBumping(true);
+    setTimeout(() => setIsCartBumping(false), 300);
+
+    // 4. Animasi Tombol Item (Berubah Hijau)
+    setAddedItems((prev) => ({ ...prev, [menu.id]: true }));
+    setTimeout(() => {
+      setAddedItems((prev) => ({ ...prev, [menu.id]: false }));
+    }, 1000);
+  };
+
   const formatRupiah = (price: string | number) => {
     return new Intl.NumberFormat("id-ID", {
       style: "currency",
@@ -52,6 +82,17 @@ export default function MenuPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
+      
+      {/* --- POP-UP NOTIFIKASI (TOAST) --- */}
+      {toast && (
+        <div className="fixed top-24 left-1/2 transform -translate-x-1/2 z-[100] flex items-center gap-3 bg-slate-900 text-white px-6 py-3 rounded-full shadow-2xl animate-in slide-in-from-top-5 fade-in duration-300">
+          <div className="bg-green-500 rounded-full p-1">
+            <CheckCircle2 className="h-4 w-4 text-white" />
+          </div>
+          <span className="font-medium text-sm">{toast.message}</span>
+        </div>
+      )}
+
       {/* Navbar */}
       <nav className="sticky top-0 z-50 w-full bg-white/95 backdrop-blur-md border-b px-4 py-4 shadow-sm">
         <div className="container mx-auto flex justify-between items-center">
@@ -62,11 +103,14 @@ export default function MenuPage() {
           
           <h1 className="text-xl font-bold text-primary">Daftar Menu</h1>
           
-          {/* 3. Update Ikon Keranjang dengan Link ke /cart */}
-          <Link href="/cart" className="relative cursor-pointer hover:scale-110 transition-transform p-2">
-            <ShoppingCart className="h-6 w-6 text-slate-600 hover:text-primary transition-colors" />
+          {/* Ikon Keranjang dengan Animasi Bump */}
+          <Link href="/cart" className="relative cursor-pointer p-2">
+            <div className={`transition-transform duration-300 ${isCartBumping ? "scale-125 text-primary" : "scale-100 text-slate-600 hover:text-primary"}`}>
+               <ShoppingCart className="h-6 w-6" />
+            </div>
+            
             {totalItems > 0 && (
-              <span className="absolute top-0 right-0 bg-primary text-white text-[10px] font-bold h-4 w-4 rounded-full flex items-center justify-center shadow-sm animate-in zoom-in">
+              <span className={`absolute top-0 right-0 bg-primary text-white text-[10px] font-bold h-4 w-4 rounded-full flex items-center justify-center shadow-sm transition-transform duration-300 ${isCartBumping ? "scale-125" : "scale-100"}`}>
                 {totalItems}
               </span>
             )}
@@ -82,8 +126,12 @@ export default function MenuPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-            {menus.map((menu) => (
-              <Card key={menu.id} className="overflow-hidden border-none shadow-md hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 group bg-white rounded-3xl">
+            {menus.map((menu, index) => (
+              <Card 
+                key={menu.id} 
+                className="overflow-hidden border-none shadow-md hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 group bg-white rounded-3xl animate-in fade-in slide-in-from-bottom-4"
+                style={{ animationDelay: `${index * 50}ms`, animationFillMode: 'backwards' }}
+              >
                 <div className="relative h-56 w-full bg-slate-100 overflow-hidden">
                   {menu.imageUrl ? (
                     <Image 
@@ -123,14 +171,26 @@ export default function MenuPage() {
                       {formatRupiah(menu.price)}
                     </span>
                     
-                    {/* 4. Tombol Tambah ke Keranjang */}
+                    {/* Tombol Tambah dengan Efek Ganti Teks */}
                     <Button 
                       size="sm" 
                       disabled={!menu.isAvailable}
-                      onClick={() => addToCart(menu)} 
-                      className="rounded-full px-6 bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all font-bold h-10 active:scale-95"
+                      onClick={() => handleAddToCart(menu)} 
+                      className={`rounded-full px-6 transition-all font-bold h-10 shadow-lg active:scale-95 duration-300 ${
+                        addedItems[menu.id] 
+                          ? "bg-green-600 hover:bg-green-700 text-white w-32" 
+                          : "bg-primary hover:bg-primary/90 text-white shadow-primary/20 hover:shadow-primary/30 w-28"
+                      }`}
                     >
-                      <Plus className="h-4 w-4 mr-1" /> Tambah
+                      {addedItems[menu.id] ? (
+                         <>
+                           <Check className="h-4 w-4 mr-1 animate-in zoom-in spin-in-90 duration-300" /> Masuk
+                         </>
+                      ) : (
+                         <>
+                           <Plus className="h-4 w-4 mr-1" /> Tambah
+                         </>
+                      )}
                     </Button>
                   </div>
                 </CardContent>

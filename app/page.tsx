@@ -23,8 +23,20 @@ import {
   MessageCircle,
   Bell,
   ClipboardList,
-  LayoutDashboard // <-- Import Icon Dashboard
+  LayoutDashboard
 } from "lucide-react";
+
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 // Tipe data Menu
 interface Menu {
@@ -68,9 +80,9 @@ export default function LandingPage() {
   useEffect(() => {
     const fetchFeaturedMenus = async () => {
       try {
-        const res = await fetch("/api/menus");
+        const res = await fetch("/api/menus?featured=true"); 
         const data = await res.json();
-        setFeaturedMenus(data.slice(0, 3)); 
+        setFeaturedMenus(data); 
       } catch (error) {
         console.error("Gagal ambil menu", error);
       } finally {
@@ -85,8 +97,10 @@ export default function LandingPage() {
       style: "currency",
       currency: "IDR",
       minimumFractionDigits: 0,
-    }).format(Number(price));
+     }).format(Number(price));
   };
+
+  const isAdmin = session?.user?.role === "ADMIN";
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans relative">
@@ -144,25 +158,28 @@ export default function LandingPage() {
               <div className="flex items-center gap-2 md:gap-4">
                 
                 {/* --- KHUSUS ADMIN: TOMBOL DASHBOARD --- */}
-                {session.user.role === "ADMIN" && (
+                {isAdmin && (
                   <Link href="/admin" className="relative p-2 hover:bg-slate-100 rounded-full transition-colors text-primary" title="Ke Dashboard Admin">
-                    <LayoutDashboard className="h-6 w-6" />
+                    <LayoutDashboard className="h-5 w-5 md:h-6 md:w-6" />
                   </Link>
                 )}
 
-                {/* 1. ICON CHAT */}
-                <Link href="/chat" className="relative p-2 hover:bg-slate-100 rounded-full transition-colors hidden sm:block" title="Chat Admin">
-                  <MessageCircle className="h-6 w-6 text-slate-600 hover:text-primary" />
+                {/* 1. MENU PESANAN (Sekarang di Kiri Chat) */}
+                <Link href="/orders">
+                   <Button variant="ghost" className="flex items-center gap-2 text-slate-700 font-bold hover:text-primary hover:bg-primary/5 px-2 md:px-4">
+                      <ClipboardList className="h-5 w-5 text-primary" />
+                      <span className="hidden sm:inline">Pesanan</span>
+                   </Button>
                 </Link>
 
-                {/* 2. ICON RIWAYAT PESANAN */}
-                <Link href="/orders" className="relative p-2 hover:bg-slate-100 rounded-full transition-colors" title="Riwayat Pesanan">
-                  <ClipboardList className="h-6 w-6 text-slate-600 hover:text-primary" />
+                {/* 2. ICON CHAT (Sekarang di Kanan Pesanan) */}
+                <Link href="/chat" className="relative p-2 hover:bg-slate-100 rounded-full transition-colors hidden sm:block" title="Chat Admin">
+                  <MessageCircle className="h-5 w-5 md:h-6 md:w-6 text-slate-600 hover:text-primary" />
                 </Link>
 
                 {/* 3. ICON KERANJANG */}
-                <Link href="/cart" className="relative p-2 hover:bg-slate-100 rounded-full transition-colors">
-                  <ShoppingCart className="h-6 w-6 text-slate-600 hover:text-primary" />
+                <Link href="/cart" className="relative p-2 hover:bg-slate-100 rounded-full transition-colors mr-2">
+                  <ShoppingCart className="h-5 w-5 md:h-6 md:w-6 text-slate-600 hover:text-primary" />
                   {totalItems > 0 && (
                     <span className="absolute top-0 right-0 bg-primary text-white text-[10px] font-bold h-4 w-4 rounded-full flex items-center justify-center shadow-sm animate-in zoom-in">
                       {totalItems}
@@ -170,20 +187,43 @@ export default function LandingPage() {
                   )}
                 </Link>
 
-                <div className="hidden md:flex items-center gap-2 text-sm font-bold text-primary bg-primary/5 px-4 py-2 rounded-full border border-primary/10">
+                {/* USER PROFILE */}
+                <div className="hidden md:flex items-center gap-2 text-sm font-bold text-slate-600 bg-slate-100 px-4 py-2 rounded-full">
                   <User className="h-4 w-4" />
                   <span className="capitalize truncate max-w-[100px]">{session.user?.name || "Kakak"}</span>
                 </div>
                 
-                <Button 
-                  variant="destructive" 
-                  size="sm" 
-                  onClick={() => signOut({ callbackUrl: "/" })} 
-                  className="rounded-full w-9 h-9 p-0 md:w-auto md:px-4 md:h-9 shadow-md hover:shadow-lg transition-all"
-                >
-                  <LogOut className="h-4 w-4 md:mr-2" /> 
-                  <span className="hidden md:inline">Keluar</span>
-                </Button>
+                {/* 4. TOMBOL KELUAR (Dengan Konfirmasi) */}
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="rounded-full text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all"
+                      title="Keluar"
+                    >
+                      <LogOut className="h-5 w-5" /> 
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Konfirmasi Keluar</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Apakah Anda yakin ingin keluar dari akun? Anda perlu login kembali untuk melakukan pemesanan.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Batal</AlertDialogCancel>
+                      <AlertDialogAction 
+                        onClick={() => signOut({ callbackUrl: "/" })}
+                        className="bg-red-600 hover:bg-red-700 focus:ring-red-600 text-white"
+                      >
+                        Ya, Keluar
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+
               </div>
             ) : (
               // JIKA BELUM LOGIN
@@ -221,15 +261,11 @@ export default function LandingPage() {
             Cocok untuk makan siang kantor, acara keluarga, atau bekal harian.
           </p>
 
-          <div className="flex flex-col sm:flex-row justify-center gap-4">
+          <div className="flex flex-col items-center justify-center gap-4">
+            {/* Tombol Utama Ditengah */}
             <Link href={session ? "/menu" : "/register"}>
-              <Button size="lg" className="h-14 px-8 text-lg rounded-full w-full sm:w-auto bg-primary hover:bg-primary/90 shadow-xl shadow-primary/25 hover:shadow-2xl hover:shadow-primary/30 hover:-translate-y-1 transition-all duration-300 font-bold">
+              <Button size="lg" className="h-14 px-10 text-lg rounded-full w-full sm:w-auto bg-primary hover:bg-primary/90 shadow-xl shadow-primary/25 hover:shadow-2xl hover:shadow-primary/30 hover:-translate-y-1 transition-all duration-300 font-bold">
                 {session ? "Pesan Makanan" : "Pesan Sekarang"} <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-            </Link>
-            <Link href="/menu">
-              <Button variant="outline" size="lg" className="h-14 px-8 text-lg rounded-full w-full sm:w-auto border-2 hover:bg-slate-50 hover:text-primary font-semibold">
-                Lihat Menu Hari Ini
               </Button>
             </Link>
           </div>
@@ -328,6 +364,7 @@ export default function LandingPage() {
                     <div className="flex justify-between items-center">
                       <span className="font-black text-lg text-slate-900">{formatRupiah(menu.price)}</span>
                       
+                      {/* Navigasi: Login/Menu */}
                       <Link href={session ? "/menu" : "/login"}>
                         <Button 
                           size="sm" 
