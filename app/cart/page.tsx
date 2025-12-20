@@ -17,13 +17,12 @@ export default function CartPage() {
   
   const [isCheckingOut, setIsCheckingOut] = useState(false);
 
-  // --- 1. STATE UNTUK ANIMASI BUMP (Baru Ditambahkan) ---
+  // --- 1. STATE UNTUK ANIMASI BUMP ---
   const [animatingId, setAnimatingId] = useState<string | null>(null);
 
-  // Fungsi helper untuk memicu animasi
   const triggerAnimation = (id: string) => {
     setAnimatingId(id);
-    setTimeout(() => setAnimatingId(null), 200); // Animasi berjalan 200ms
+    setTimeout(() => setAnimatingId(null), 200); 
   };
 
   const formatRupiah = (price: number) => {
@@ -58,9 +57,15 @@ export default function CartPage() {
       if (!res.ok) throw new Error(data.message || "Gagal membuat pesanan");
 
       if (data.paymentUrl) {
-        // JANGAN clearCart() DI SINI. 
-        // Biarkan user bayar dulu. Kalau sukses, Xendit akan lempar ke halaman sukses, baru kita clear di sana.
+        // --- LOGIKA UTAMA DI SINI ---
+        
+        // 1. Kosongkan keranjang sekarang juga
+        clearCart(); 
+        
+        // 2. Redirect ke halaman pembayaran
+        // Keranjang sudah kosong di state, jadi saat user kembali nanti, cart sudah bersih.
         window.location.href = data.paymentUrl; 
+
       } else {
         alert("Gagal mendapatkan link pembayaran.");
         setIsCheckingOut(false);
@@ -76,16 +81,13 @@ export default function CartPage() {
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
       <nav className="sticky top-0 z-50 w-full bg-white/95 backdrop-blur-md border-b px-4 py-4 shadow-sm">
-        {/* UBAH DI SINI: Tambahkan 'relative' dan 'justify-center', hapus 'gap-4' */}
         <div className="container mx-auto flex items-center justify-center relative">
           
-          {/* UBAH DI SINI: Tambahkan 'absolute left-0' agar tombol menempel di kiri tanpa mendorong teks tengah */}
           <Link href="/menu" className="absolute left-0 flex items-center gap-2 text-slate-600 hover:text-primary transition-colors">
             <ArrowLeft className="h-5 w-5" />
             <span className="font-medium hidden sm:block">Lanjut Belanja</span>
           </Link>
           
-          {/* Judul sekarang otomatis berada di tengah karena parent menggunakan justify-center */}
           <h1 className="text-xl font-bold text-primary">Keranjang Pesanan</h1>
         
         </div>
@@ -107,11 +109,10 @@ export default function CartPage() {
           <div className="space-y-6">
             <div className="space-y-4">
               {items.map((item, index) => (
-                // Tambahkan animasi 'animate-in' agar item terlihat masuk saat halaman dimuat
                 <Card 
                   key={item.id} 
                   className="overflow-hidden border-none shadow-sm hover:shadow-md transition-shadow bg-white rounded-2xl animate-in slide-in-from-bottom-5 fade-in duration-500"
-                  style={{ animationDelay: `${index * 100}ms` }} // Efek muncul bergantian
+                  style={{ animationDelay: `${index * 100}ms` }} 
                 >
                   <CardContent className="p-4 flex items-center gap-4">
                     <div className="relative h-20 w-20 bg-slate-100 rounded-xl overflow-hidden shrink-0">
@@ -128,7 +129,6 @@ export default function CartPage() {
                     
                     <div className="flex items-center gap-3 bg-slate-50 rounded-full p-1 border border-slate-200">
                       
-                      {/* Tombol Kurang */}
                       <button 
                         onClick={() => { decreaseQuantity(item.id); triggerAnimation(item.id); }} 
                         className="h-8 w-8 flex items-center justify-center rounded-full bg-white text-slate-600 shadow-sm hover:text-primary active:scale-90 transition-all"
@@ -136,7 +136,6 @@ export default function CartPage() {
                         {item.quantity === 1 ? <Trash2 className="h-4 w-4 text-red-500" /> : <Minus className="h-4 w-4" />}
                       </button>
                       
-                      {/* --- 2. LOGIKA ANIMASI PADA ANGKA --- */}
                       <span 
                         className={`font-bold w-4 text-center text-sm transition-all duration-200 ${
                           animatingId === item.id ? "scale-150 text-green-600" : "scale-100 text-slate-900"
@@ -145,7 +144,6 @@ export default function CartPage() {
                         {item.quantity}
                       </span>
                       
-                      {/* Tombol Tambah */}
                       <button 
                         onClick={() => { addToCart(item); triggerAnimation(item.id); }} 
                         className="h-8 w-8 flex items-center justify-center rounded-full bg-primary text-white shadow-sm hover:bg-primary/90 active:scale-90 transition-all"
