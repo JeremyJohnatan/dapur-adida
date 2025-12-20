@@ -5,7 +5,6 @@ import { NextResponse } from "next/server";
 import { Xendit } from 'xendit-node';
 import { authOptions } from "@/lib/auth";
 
-
 const apiKey = process.env.XENDIT_SECRET_KEY;
 const xenditClient = new Xendit({ secretKey: apiKey || "" });
 
@@ -33,7 +32,12 @@ export async function POST(request: Request) {
     if (!session || !session.user) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
 
     const body = await request.json();
-    const { items, totalPrice } = body;
+
+    // 🔥 PERBAIKAN 1: Ambil 'note' dari body request
+    const { items, totalPrice, note } = body;
+
+    // Debugging (Opsional: Cek di terminal server)
+    console.log("🔥 ORDER DATA MASUK:", { user: session.user.name, total: totalPrice, note: note });
 
     if (!items || items.length === 0) return NextResponse.json({ message: "Keranjang kosong" }, { status: 400 });
 
@@ -49,7 +53,7 @@ export async function POST(request: Request) {
        validEmail = `${sanitizedName}@temp.dapuradida.com`;
     }
 
-    // Base URL (Ganti ini jika nanti deploy ke Vercel)
+    // Base URL
     const BASE_URL = process.env.NEXTAUTH_URL || "http://localhost:3000";
 
     const result = await prisma.$transaction(async (tx) => {
@@ -58,6 +62,8 @@ export async function POST(request: Request) {
           userId: session?.user?.id,
           totalAmount: amountNumber,
           status: "PENDING",
+          // 🔥 PERBAIKAN 2: Simpan 'note' ke database
+          note: note ? note : null, 
         },
       });
 
@@ -82,7 +88,6 @@ export async function POST(request: Request) {
           description: `Order #${order.id.slice(-5)} - Dapur Adida`,
           invoiceDuration: 86400,
           currency: "IDR",
-          // INI PENTING: Arahkan balik ke halaman sukses/gagal di aplikasi kita
           successRedirectUrl: `${BASE_URL}/order-success`, 
           failureRedirectUrl: `${BASE_URL}/cart`,
         }

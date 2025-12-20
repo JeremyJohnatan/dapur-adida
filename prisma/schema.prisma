@@ -48,14 +48,14 @@ model User {
 }
 
 model Menu {
-  id          String      @id @default(cuid())
+  id          String    @id @default(cuid())
   name        String
   description String?
-  price       Decimal     @db.Decimal(10, 2)
+  price       Decimal   @db.Decimal(10, 2)
   imageUrl    String?
-  isAvailable Boolean     @default(true)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  isAvailable Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
   orderItems  OrderItem[]
 }
 
@@ -65,6 +65,11 @@ model Order {
   user        User        @relation(fields: [userId], references: [id])
   totalAmount Decimal     @db.Decimal(12, 2)
   status      OrderStatus @default(PENDING)
+  
+  // === TAMBAHAN ===
+  note        String?     // Catatan pesanan (opsional)
+  // ================
+
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
   items       OrderItem[]
@@ -72,14 +77,14 @@ model Order {
 }
 
 model OrderItem {
-  id        String   @id @default(cuid())
+  id        String  @id @default(cuid())
   orderId   String
-  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   menuId    String
-  menu      Menu     @relation(fields: [menuId], references: [id])
+  menu      Menu    @relation(fields: [menuId], references: [id])
   quantity  Int
-  price     Decimal  @db.Decimal(10, 2)
-  subtotal  Decimal  @db.Decimal(12, 2)
+  price     Decimal @db.Decimal(10, 2)
+  subtotal  Decimal @db.Decimal(12, 2)
 }
 
 model Payment {

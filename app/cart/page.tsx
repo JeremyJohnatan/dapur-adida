@@ -16,8 +16,9 @@ export default function CartPage() {
   const router = useRouter();
   
   const [isCheckingOut, setIsCheckingOut] = useState(false);
+  // 1. STATE UNTUK MENAMPUNG CATATAN
+  const [note, setNote] = useState(""); 
 
-  // --- 1. STATE UNTUK ANIMASI BUMP ---
   const [animatingId, setAnimatingId] = useState<string | null>(null);
 
   const triggerAnimation = (id: string) => {
@@ -43,12 +44,17 @@ export default function CartPage() {
     setIsCheckingOut(true);
 
     try {
+      // DEBUG: Cek di console browser (F12) apakah note ada isinya
+      console.log("Mengirim Order dengan Note:", note);
+
       const res = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        // 2. PASTIKAN 'note' ADA DI SINI
         body: JSON.stringify({
           items: items,
           totalPrice: totalPrice,
+          note: note, 
         }),
       });
 
@@ -57,15 +63,8 @@ export default function CartPage() {
       if (!res.ok) throw new Error(data.message || "Gagal membuat pesanan");
 
       if (data.paymentUrl) {
-        // --- LOGIKA UTAMA DI SINI ---
-        
-        // 1. Kosongkan keranjang sekarang juga
         clearCart(); 
-        
-        // 2. Redirect ke halaman pembayaran
-        // Keranjang sudah kosong di state, jadi saat user kembali nanti, cart sudah bersih.
         window.location.href = data.paymentUrl; 
-
       } else {
         alert("Gagal mendapatkan link pembayaran.");
         setIsCheckingOut(false);
@@ -82,14 +81,11 @@ export default function CartPage() {
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
       <nav className="sticky top-0 z-50 w-full bg-white/95 backdrop-blur-md border-b px-4 py-4 shadow-sm">
         <div className="container mx-auto flex items-center justify-center relative">
-          
           <Link href="/menu" className="absolute left-0 flex items-center gap-2 text-slate-600 hover:text-primary transition-colors">
             <ArrowLeft className="h-5 w-5" />
             <span className="font-medium hidden sm:block">Lanjut Belanja</span>
           </Link>
-          
           <h1 className="text-xl font-bold text-primary">Keranjang Pesanan</h1>
-        
         </div>
       </nav>
 
@@ -128,33 +124,40 @@ export default function CartPage() {
                     </div>
                     
                     <div className="flex items-center gap-3 bg-slate-50 rounded-full p-1 border border-slate-200">
-                      
                       <button 
                         onClick={() => { decreaseQuantity(item.id); triggerAnimation(item.id); }} 
                         className="h-8 w-8 flex items-center justify-center rounded-full bg-white text-slate-600 shadow-sm hover:text-primary active:scale-90 transition-all"
                       >
                         {item.quantity === 1 ? <Trash2 className="h-4 w-4 text-red-500" /> : <Minus className="h-4 w-4" />}
                       </button>
-                      
-                      <span 
-                        className={`font-bold w-4 text-center text-sm transition-all duration-200 ${
-                          animatingId === item.id ? "scale-150 text-green-600" : "scale-100 text-slate-900"
-                        }`}
-                      >
+                      <span className={`font-bold w-4 text-center text-sm transition-all duration-200 ${animatingId === item.id ? "scale-150 text-green-600" : "scale-100 text-slate-900"}`}>
                         {item.quantity}
                       </span>
-                      
                       <button 
                         onClick={() => { addToCart(item); triggerAnimation(item.id); }} 
                         className="h-8 w-8 flex items-center justify-center rounded-full bg-primary text-white shadow-sm hover:bg-primary/90 active:scale-90 transition-all"
                       >
                         <Plus className="h-4 w-4" />
                       </button>
-
                     </div>
                   </CardContent>
                 </Card>
               ))}
+            </div>
+            
+            {/* 3. INPUT TEXTAREA (Wajib Terhubung ke State 'note') */}
+            <div className="bg-white p-4 rounded-2xl shadow-sm space-y-2 border border-slate-100">
+              <label htmlFor="note" className="font-bold text-slate-700 text-sm flex items-center gap-2">
+                <span className="bg-yellow-100 text-yellow-700 p-1 rounded">Catatan Pesanan</span> (Opsional)
+              </label>
+              <textarea
+                id="note"
+                className="w-full border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none bg-slate-50 placeholder:text-slate-400"
+                placeholder="Contoh: Jangan terlalu pedas, kuah dipisah, minta sendok..."
+                rows={3}
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+              />
             </div>
 
             <Card className="border-none shadow-lg bg-white rounded-2xl sticky bottom-4 animate-in slide-in-from-bottom-10 fade-in duration-700">

@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import Link from "next/link"; 
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, CheckCircle, ChefHat, Clock, XCircle } from "lucide-react";
+import { Loader2, CheckCircle, ChefHat, Clock, XCircle, StickyNote, MessageCircle } from "lucide-react"; 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-// Tipe data (agar coding lebih aman)
+// Tipe data
 interface OrderItem {
   id: string;
   quantity: number;
@@ -20,7 +21,8 @@ interface Order {
   totalAmount: string;
   status: string;
   createdAt: string;
-  user: { fullName: string; email: string };
+  note?: string | null; // Pastikan tipe data note ada
+  user: { id: string; fullName: string; email: string }; 
   items: OrderItem[];
 }
 
@@ -46,7 +48,6 @@ export default function AdminOrdersPage() {
 
   // Update Status
   const handleStatusChange = async (orderId: string, newStatus: string) => {
-    // Optimistic Update (Ubah UI dulu biar cepat)
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
 
     try {
@@ -57,7 +58,7 @@ export default function AdminOrdersPage() {
       });
     } catch (error) {
       console.error("Gagal update status");
-      fetchOrders(); // Revert jika gagal
+      fetchOrders(); 
     }
   };
 
@@ -99,11 +100,22 @@ export default function AdminOrdersPage() {
                       <span className="font-mono text-xs text-slate-400">#{order.id.slice(-5).toUpperCase()}</span>
                       {getStatusBadge(order.status)}
                     </div>
-                    <h3 className="font-bold text-lg text-slate-800">{order.user?.fullName}</h3>
+                    
+                    {/* Nama User & Link Chat Admin */}
+                    <div className="flex items-center gap-2">
+                        <h3 className="font-bold text-lg text-slate-800">{order.user?.fullName}</h3>
+                        
+                        <Link href={`/admin/chat?userId=${order.user?.id}`} title="Chat Pelanggan">
+                            <div className="bg-blue-50 hover:bg-blue-100 p-1.5 rounded-full text-blue-600 transition-colors cursor-pointer">
+                                <MessageCircle className="w-4 h-4" />
+                            </div>
+                        </Link>
+                    </div>
+
                     <p className="text-sm text-slate-500">{new Date(order.createdAt).toLocaleString('id-ID')}</p>
                   </div>
 
-                  {/* Detail Item */}
+                  {/* Detail Item & Notes */}
                   <div className="flex-1 bg-slate-50 p-4 rounded-lg text-sm space-y-1">
                     {order.items.map((item) => (
                       <div key={item.id} className="flex justify-between">
@@ -111,6 +123,19 @@ export default function AdminOrdersPage() {
                         <span className="font-medium">{formatRupiah(Number(item.price) * item.quantity)}</span>
                       </div>
                     ))}
+
+                    {/* === BAGIAN NOTES === */}
+                    {/* Notes hanya muncul jika order.note tidak kosong */}
+                    {order.note && (
+                        <div className="mt-3 pt-3 border-t border-slate-200 flex gap-2 items-start text-amber-700 bg-amber-50/50 p-2 rounded-md animate-in fade-in">
+                            <StickyNote className="w-4 h-4 mt-0.5 shrink-0" />
+                            <div>
+                                <span className="font-bold text-xs uppercase block text-amber-800 mb-0.5">Catatan Pembeli:</span>
+                                <p className="italic text-slate-700">"{order.note}"</p>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="border-t border-slate-200 mt-2 pt-2 flex justify-between font-bold text-slate-800">
                       <span>Total</span>
                       <span>{formatRupiah(order.totalAmount)}</span>
