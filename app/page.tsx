@@ -23,7 +23,9 @@ import {
   MessageCircle,
   Bell,
   ClipboardList,
-  LayoutDashboard
+  LayoutDashboard,
+  Instagram, // Tambahan Import Icon Instagram
+  Phone      // Tambahan Import Icon Phone (untuk WA)
 } from "lucide-react";
 
 import {
@@ -142,19 +144,11 @@ export default function LandingPage() {
             </Link>
           </div>
 
-          {/* Menu Desktop (Tengah Absolut) */}
-          <div className="hidden md:flex gap-8 text-sm font-semibold text-slate-600 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
-            <Link href="/menu" className="hover:text-primary transition-colors">Menu</Link>
-            <Link href="#layanan" className="hover:text-primary transition-colors">Layanan</Link>
-            <Link href="#testimoni" className="hover:text-primary transition-colors">Testimoni</Link>
-          </div>
-
           {/* LOGIKA USER & CART (Kanan) */}
           <div className="flex items-center gap-2 md:gap-3 z-20">
             {status === "loading" ? (
               <span className="text-xs md:text-sm text-slate-400 animate-pulse">Memuat...</span>
             ) : session ? (
-              // JIKA SUDAH LOGIN
               <div className="flex items-center gap-2 md:gap-4">
                 
                 {/* --- KHUSUS ADMIN: TOMBOL DASHBOARD --- */}
@@ -164,15 +158,15 @@ export default function LandingPage() {
                   </Link>
                 )}
 
-                {/* 1. MENU PESANAN (Sekarang di Kiri Chat) */}
+                {/* 1. MENU PESANAN */}
                 <Link href="/orders">
-                   <Button variant="ghost" className="flex items-center gap-2 text-slate-700 font-bold hover:text-primary hover:bg-primary/5 px-2 md:px-4">
+                    <Button variant="ghost" className="flex items-center gap-2 text-slate-700 font-bold hover:text-primary hover:bg-primary/5 px-2 md:px-4">
                       <ClipboardList className="h-5 w-5 text-primary" />
                       <span className="hidden sm:inline">Pesanan</span>
-                   </Button>
+                    </Button>
                 </Link>
 
-                {/* 2. ICON CHAT (Sekarang di Kanan Pesanan) */}
+                {/* 2. ICON CHAT */}
                 <Link href="/chat" className="relative p-2 hover:bg-slate-100 rounded-full transition-colors hidden sm:block" title="Chat Admin">
                   <MessageCircle className="h-5 w-5 md:h-6 md:w-6 text-slate-600 hover:text-primary" />
                 </Link>
@@ -193,7 +187,7 @@ export default function LandingPage() {
                   <span className="capitalize truncate max-w-[100px]">{session.user?.name || "Kakak"}</span>
                 </div>
                 
-                {/* 4. TOMBOL KELUAR (Dengan Konfirmasi) */}
+                {/* 4. TOMBOL KELUAR */}
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button 
@@ -226,7 +220,6 @@ export default function LandingPage() {
 
               </div>
             ) : (
-              // JIKA BELUM LOGIN
               <>
                 <Link href="/login">
                   <Button variant="ghost" size="sm" className="hover:text-primary hover:bg-primary/5 font-semibold">
@@ -262,7 +255,6 @@ export default function LandingPage() {
           </p>
 
           <div className="flex flex-col items-center justify-center gap-4">
-            {/* Tombol Utama Ditengah */}
             <Link href={session ? "/menu" : "/register"}>
               <Button size="lg" className="h-14 px-10 text-lg rounded-full w-full sm:w-auto bg-primary hover:bg-primary/90 shadow-xl shadow-primary/25 hover:shadow-2xl hover:shadow-primary/30 hover:-translate-y-1 transition-all duration-300 font-bold">
                 {session ? "Pesan Makanan" : "Pesan Sekarang"} <ArrowRight className="ml-2 h-5 w-5" />
@@ -270,7 +262,6 @@ export default function LandingPage() {
             </Link>
           </div>
 
-          {/* Statistik */}
           <div className="mt-20 grid grid-cols-2 md:grid-cols-4 gap-8 max-w-4xl mx-auto border-t border-slate-200 pt-10">
             <StatItem value="5k+" label="Pelanggan Puas" />
             <StatItem value="50+" label="Menu Variatif" />
@@ -284,11 +275,14 @@ export default function LandingPage() {
       <section id="layanan" className="py-24 bg-white">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-4 text-slate-900">
-              Kenapa Memilih <span className="text-primary">Kami?</span>
+            <span className="text-primary font-bold text-sm tracking-widest uppercase mb-3 block">Komitmen Kami</span>
+            <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-6 text-slate-900">
+              Kenapa Harus <span className="text-primary">Dapur Adida?</span>
             </h2>
-            <p className="text-slate-600 max-w-2xl mx-auto text-lg">
-              Kami tidak hanya menjual makanan, tapi juga kualitas dan kepercayaan untuk kesehatan keluarga Anda.
+            <p className="text-slate-600 max-w-2xl mx-auto text-lg leading-relaxed">
+              Kami paham bahwa makanan bukan sekadar pengisi perut, melainkan <strong>investasi kesehatan jangka panjang</strong>. 
+              Oleh karena itu, Dapur Adida berkomitmen menerapkan <strong>standar kebersihan ketat</strong> dan hanya menggunakan bahan-bahan segar pilihan. 
+              Percayakan kebutuhan konsumsi Anda pada kami, dan nikmati <strong>ketenangan pikiran</strong> saat menyantap hidangan yang lezat, bernutrisi, dan terjamin kualitasnya.
             </p>
           </div>
 
@@ -312,7 +306,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ===== 4. MENU PREVIEW (Dynamic) ===== */}
+      {/* ===== 4. MENU PREVIEW ===== */}
       <section id="menu" className="py-24 bg-slate-50/50">
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-4">
@@ -364,7 +358,6 @@ export default function LandingPage() {
                     <div className="flex justify-between items-center">
                       <span className="font-black text-lg text-slate-900">{formatRupiah(menu.price)}</span>
                       
-                      {/* Navigasi: Login/Menu */}
                       <Link href={session ? "/menu" : "/login"}>
                         <Button 
                           size="sm" 
@@ -389,11 +382,14 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ===== 5. FOOTER ===== */}
+      {/* ===== 5. FOOTER (UPDATED) ===== */}
       <footer className="bg-slate-900 text-slate-300 py-16 border-t border-slate-800">
         <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
-            <div className="col-span-1 md:col-span-2">
+          {/* Ubah Grid jadi 2 Kolom Besar (Brand & Kontak) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-12">
+            
+            {/* Bagian Brand */}
+            <div>
               <div className="flex items-center gap-3 mb-6 text-white">
                 <div className="relative h-12 w-12 overflow-hidden rounded-full border-2 border-slate-600">
                    <Image 
@@ -410,32 +406,35 @@ export default function LandingPage() {
               </p>
             </div>
             
-            <div>
-              <h4 className="font-bold text-white mb-6 text-lg">Tautan</h4>
-              <ul className="space-y-3 text-sm">
-                <li><Link href="#" className="hover:text-primary transition-colors duration-200">Tentang Kami</Link></li>
-                <li><Link href="#" className="hover:text-primary transition-colors duration-200">Cara Pesan</Link></li>
-                <li><Link href="#" className="hover:text-primary transition-colors duration-200">Karir</Link></li>
-                <li><Link href="#" className="hover:text-primary transition-colors duration-200">Syarat & Ketentuan</Link></li>
-              </ul>
-            </div>
-            
-            <div>
+            {/* Bagian Hubungi Kami (Revisi: Tanpa Tautan, Ada Logo WA/IG) */}
+            <div className="flex flex-col justify-start md:items-end">
               <h4 className="font-bold text-white mb-6 text-lg">Hubungi Kami</h4>
-              <ul className="space-y-3 text-sm">
-                <li className="flex items-center gap-2">
-                  <span className="font-bold text-primary">WA:</span> 
-                  <span className="hover:text-white transition-colors cursor-pointer">0812-3456-7890</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="font-bold text-primary">Email:</span> 
-                  <span className="hover:text-white transition-colors cursor-pointer">hello@dapuradida.com</span>
-                </li>
-                <li className="text-slate-500 mt-2">
-                  Jl. Rasa Juara No. 1<br/>Jakarta Selatan, Indonesia
-                </li>
-              </ul>
+              
+              <div className="text-left md:text-right space-y-2 mb-6">
+                 <p className="text-slate-400 text-sm leading-relaxed">
+                    Jl. Kaliurang Barat Gang III No. 1391, Kota Malang<br/>
+                    Indonesia
+                 </p>
+              </div>
+
+              {/* Tombol Sosial Media */}
+              <div className="flex flex-col sm:flex-row gap-4">
+                {/* Tombol WhatsApp */}
+                <Link href="https://wa.me/6285182734247" target="_blank" rel="noopener noreferrer">
+                  <Button className="bg-[#25D366] hover:bg-[#128C7E] text-white font-bold rounded-full gap-2 shadow-lg hover:shadow-[#25D366]/20 transition-all w-full sm:w-auto">
+                    <Phone className="h-5 w-5 fill-current" /> WhatsApp
+                  </Button>
+                </Link>
+
+                {/* Tombol Instagram */}
+                <Link href="https://instagram.com/jeremyjohnatan_" target="_blank" rel="noopener noreferrer">
+                  <Button className="bg-gradient-to-tr from-[#FFB224] via-[#FF4D4D] to-[#B235E6] hover:opacity-90 text-white font-bold rounded-full gap-2 shadow-lg border-0 transition-all w-full sm:w-auto">
+                    <Instagram className="h-5 w-5" /> Instagram
+                  </Button>
+                </Link>
+              </div>
             </div>
+
           </div>
           
           <div className="border-t border-slate-800 pt-8 text-center text-xs text-slate-600 font-medium">
@@ -444,7 +443,7 @@ export default function LandingPage() {
         </div>
       </footer>
 
-      {/* ===== FLOATING CHAT BUTTON (Muncul kalau login) ===== */}
+      {/* ===== FLOATING CHAT BUTTON ===== */}
       {session && (
         <Link href="/chat">
           <div className="fixed bottom-6 right-6 z-50 animate-in slide-in-from-bottom-4">
@@ -460,7 +459,7 @@ export default function LandingPage() {
   );
 }
 
-// --- Komponen Kecil (Helper) ---
+// --- Komponen Kecil ---
 
 function StatItem({ value, label }: { value: string, label: string }) {
   return (
