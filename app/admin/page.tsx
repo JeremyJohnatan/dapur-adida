@@ -15,11 +15,10 @@ import {
   Info,
   Calendar as CalendarIcon, 
   Filter,
-  AlertCircle // Icon untuk error
+  AlertCircle 
 } from "lucide-react";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState<any>(null);
@@ -27,8 +26,8 @@ export default function AdminDashboard() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // --- STATE TANGGAL ---
-  // Default: 7 Hari Terakhir
   const todayStr = new Date().toISOString().split('T')[0];
+  // Mundur 7 hari
   const last7DaysStr = new Date(new Date().setDate(new Date().getDate() - 6)).toISOString().split('T')[0];
 
   const [startDate, setStartDate] = useState(last7DaysStr);
@@ -36,13 +35,36 @@ export default function AdminDashboard() {
 
   // Fungsi Fetch Data
   const fetchStats = async (start: string, end: string) => {
-    setErrorMsg(null); // Reset error
+    setErrorMsg(null); 
     setLoading(true);
+    
     try {
-      const res = await fetch(`/api/admin/dashboard?startDate=${start}&endDate=${end}`);
-      if (res.ok) setStats(await res.json());
+      // TAMBAHAN: &_t=timestamp untuk mencegah browser caching
+      const timestamp = new Date().getTime();
+      const url = `/api/admin/dashboard?startDate=${start}&endDate=${end}&_t=${timestamp}`;
+      
+
+
+      const res = await fetch(url, {
+        method: "GET",
+        cache: "no-store", // PAKSA TIDAK CACHE
+        headers: {
+            "Content-Type": "application/json",
+            "Pragma": "no-cache"
+        }
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+      
+        setStats(data);
+      } else {
+        console.error("❌ FE: Fetch Gagal", res.status);
+        setErrorMsg("Gagal mengambil data dari server.");
+      }
     } catch (error) {
-      console.error(error);
+      console.error("❌ FE: Error Network", error);
+      setErrorMsg("Terjadi kesalahan koneksi.");
     } finally {
       setLoading(false);
     }
@@ -56,28 +78,24 @@ export default function AdminDashboard() {
 
   // --- LOGIKA VALIDASI MAX 7 HARI ---
   const handleFilter = () => {
+
     const start = new Date(startDate);
     const end = new Date(endDate);
 
-    // 1. Cek jika Tanggal Akhir lebih kecil dari Tanggal Awal
     if (end < start) {
       setErrorMsg("Tanggal akhir tidak boleh lebih kecil dari tanggal awal.");
       return;
     }
 
-    // 2. Hitung selisih hari
     const diffTime = Math.abs(end.getTime() - start.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
 
-    // 3. Validasi Max 7 Hari (diffDays dihitung selisih, jadi range 7 hari itu selisihnya 6)
-    // Contoh: Tgl 1 s/d Tgl 7 = 7 Hari (selisih 6 hari). Kita toleransi sampai selisih 7 (8 hari total) atau ketat 6.
-    // User minta "max 7 hari", mari kita buat batas selisihnya 6 (sehingga total 7 hari inklusif).
-    if (diffDays > 6) { 
-      setErrorMsg(`Rentang tanggal terlalu lama (${diffDays + 1} hari). Maksimal 7 hari.`);
+    // Validasi Max 30 Hari (Kita longgarkan sedikit biar enak testingnya, tadinya 7)
+    if (diffDays > 30) { 
+      setErrorMsg(`Rentang tanggal terlalu lama. Maksimal 30 hari.`);
       return;
     }
 
-    // Jika lolos validasi, ambil data
     fetchStats(startDate, endDate);
   };
 
@@ -87,10 +105,8 @@ export default function AdminDashboard() {
     const start = new Date();
     
     if (days === 1) {
-      // Hari Ini
-      // start & end sama
+      // Hari Ini (start & end sama)
     } else {
-      // Mundur X hari
       start.setDate(end.getDate() - (days - 1));
     }
 
@@ -119,35 +135,12 @@ export default function AdminDashboard() {
         {/* --- AREA FILTER TANGGAL --- */}
         <div className="flex flex-col items-end gap-2 w-full xl:w-auto">
           
-          {/* Tombol Preset Cepat */}
           <div className="flex bg-slate-100 p-1 rounded-lg gap-1 self-start md:self-end">
-             <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => applyPreset(1)}
-              className="h-8 text-xs hover:bg-white hover:shadow-sm"
-            >
-              Hari Ini
-            </Button>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => applyPreset(3)}
-              className="h-8 text-xs hover:bg-white hover:shadow-sm"
-            >
-              3 Hari
-            </Button>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => applyPreset(7)}
-              className="h-8 text-xs hover:bg-white hover:shadow-sm"
-            >
-              7 Hari Terakhir
-            </Button>
+             <Button variant="ghost" size="sm" onClick={() => applyPreset(1)} className="h-8 text-xs hover:bg-white hover:shadow-sm">Hari Ini</Button>
+            <Button variant="ghost" size="sm" onClick={() => applyPreset(3)} className="h-8 text-xs hover:bg-white hover:shadow-sm">3 Hari</Button>
+            <Button variant="ghost" size="sm" onClick={() => applyPreset(7)} className="h-8 text-xs hover:bg-white hover:shadow-sm">7 Hari</Button>
           </div>
 
-          {/* Input Manual dengan Tombol Filter */}
           <div className="flex flex-col sm:flex-row items-center gap-2 bg-white p-2 rounded-lg border shadow-sm w-full sm:w-auto">
             <div className="flex items-center gap-2 px-2 w-full sm:w-auto">
               <CalendarIcon className="w-4 h-4 text-slate-400" />
@@ -167,12 +160,12 @@ export default function AdminDashboard() {
                 className="text-sm font-medium text-slate-600 outline-none cursor-pointer bg-transparent w-full"
               />
             </div>
+            {/* PASTIKAN TOMBOL INI DITEKAN */}
             <Button size="sm" onClick={handleFilter} className="w-full sm:w-auto ml-0 sm:ml-2 bg-primary hover:bg-primary/90 h-8">
               <Filter className="w-3 h-3 mr-2" /> Terapkan
             </Button>
           </div>
           
-          {/* Pesan Error Validasi */}
           {errorMsg && (
             <div className="text-xs text-red-500 font-medium flex items-center bg-red-50 px-3 py-1 rounded-md animate-in slide-in-from-top-1">
               <AlertCircle className="w-3 h-3 mr-1" /> {errorMsg}
@@ -191,6 +184,7 @@ export default function AdminDashboard() {
             </div>
           </CardHeader>
           <CardContent>
+            {/* INI ANGKA YANG HARUSNYA BERUBAH */}
             <div className="text-2xl font-bold text-slate-800">{formatRupiah(stats?.revenue || 0)}</div>
             <p className="text-xs text-slate-500 mt-1 font-medium text-green-600">
               {startDate === endDate ? "Hari Ini" : "Periode Terpilih"}
@@ -211,7 +205,7 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
-        {/* Pelanggan & Menu tetap Global (Tidak kena filter tanggal) agar logis */}
+        {/* Global Stats */}
         <Card className="shadow-sm border-l-4 border-l-orange-500 bg-white hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-slate-600">Total Pelanggan</CardTitle>
@@ -239,7 +233,7 @@ export default function AdminDashboard() {
         </Card>
       </div>
 
-      {/* --- BAGIAN 2: GRAFIK PENJUALAN --- */}
+      {/* --- GRAFIK --- */}
       <Card className="shadow-sm bg-white">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-slate-800">

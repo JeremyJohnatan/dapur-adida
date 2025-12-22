@@ -1,9 +1,12 @@
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
-import { NextResponse, NextRequest } from "next/server"; // Tambah NextRequest
+import { NextResponse, NextRequest } from "next/server";
 
-export async function GET(req: NextRequest) { // Ubah param jadi NextRequest
+// 1. PENTING: Paksa Next.js agar TIDAK menyimpan cache (Selalu ambil data baru)
+export const dynamic = 'force-dynamic';
+
+export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   
   // Proteksi: Hanya Admin
@@ -16,60 +19,107 @@ export async function GET(req: NextRequest) { // Ubah param jadi NextRequest
   const startDateParam = searchParams.get('startDate');
   const endDateParam = searchParams.get('endDate');
 
-  // Default: 7 Hari Terakhir jika tidak ada filter
-  const end = endDateParam ? new Date(endDateParam) : new Date();
-  const start = startDateParam ? new Date(startDateParam) : new Date(new Date().setDate(end.getDate() - 6));
+  // --- LOGIC TANGGAL YANG LEBIH KUAT (Anti Timezone Bug) ---
+  const now = new Date();
+  
+  // Jika parameter ada, tambahkan jam spesifik agar mencakup seluruh hari
+  // Start: Jam 00:00:00
+  const start = startDateParam 
+    ? new Date(`${startDateParam}T00:00:00.000Z`) // Pakai Z atau sesuaikan timezone jika perlu, tapi string ISO lebih aman
+    : new Date(new Date().setDate(now.getDate() - 6));
 
-  // Reset jam agar mencakup seluruh hari (00:00 - 23:59)
-  start.setHours(0, 0, 0, 0);
-  end.setHours(23, 59, 59, 999);
+  // End: Jam 23:59:59
+  const end = endDateParam 
+    ? new Date(`${endDateParam}T23:59:59.999Z`) 
+    : new Date();
+
+  // Jika tidak ada param, set default jam start/end manual
+  if (!startDateParam) start.setHours(0, 0, 0, 0);
+  if (!endDateParam) end.setHours(23, 59, 59, 999);
+
+  // DEBUGGING: Cek terminal kamu (di VS Code) saat refresh halaman dashboard
+  console.log("--- DEBUG DASHBOARD API ---");
+  console.log("Filter Start:", start);
+  console.log("Filter End  :", end);
 
   try {
-    // 1. Hitung Ringkasan Utama (Tetap Global / All Time)
-    const revenue = await prisma.order.aggregate({ _sum: { totalAmount: true }, where: { status: 'COMPLETED' } });
-    const totalOrders = await prisma.order.count();
+    // 1. HITUNG TOTAL PENDAPATAN (REVENUE)
+    // PERBAIKAN: Gunakan 'not: CANCELLED' agar sinkron dengan grafik. 
+    // Jadi status PENDING dan PROCESSING juga dihitung sebagai "Potensi Pendapatan".
+    const revenue = await prisma.order.aggregate({ 
+        _sum: { totalAmount: true }, 
+        where: { 
+            // Ubah ini! Jangan hanya 'COMPLETED' jika ingin lihat pergerakan order baru.
+            status: { not: 'CANCELLED' }, 
+            createdAt: {
+                gte: start,
+                lte: end
+            }
+        } 
+    });
+    
+    console.log("Revenue Result:", revenue._sum.totalAmount); // Cek nilai ini di terminal
+
+    // 2. HITUNG TOTAL ORDER
+    const totalOrders = await prisma.order.count({
+        where: {
+            status: { not: 'CANCELLED' },
+            createdAt: {
+                gte: start,
+                lte: end
+            }
+        }
+    });
+
+    // 3. Total Customer & Menu (Global - Tidak perlu filter tanggal)
     const totalCustomers = await prisma.user.count({ where: { role: "CUSTOMER" } });
     const totalMenu = await prisma.menu.count({ where: { isAvailable: true } });
 
-    // 2. Data Grafik (MODIFIKASI: Filter Berdasarkan Tanggal & Agregasi)
+    // 4. Data Grafik
     const ordersForGraph = await prisma.order.findMany({
       where: {
         createdAt: {
           gte: start,
           lte: end,
         },
-        status: { not: 'CANCELLED' } // Opsional: Jangan hitung yang batal
+        status: { not: 'CANCELLED' } 
       },
       orderBy: { createdAt: 'asc' },
       select: { createdAt: true, totalAmount: true }
     });
 
-    // --- LOGIKA MANUAL: Grouping per hari ---
-    // Kita buat array tanggal dari start sampai end agar grafik tidak bolong (misal tgl 12 ada, tgl 13 kosong, tgl 14 ada)
+    // Grouping per hari
     const chartDataMap: Record<string, number> = {};
     
-    // Inisialisasi setiap hari dengan 0
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      const dateKey = d.toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' }); 
+    // Looping tanggal agar grafik tidak bolong
+    const loopDate = new Date(start); 
+    // Hati-hati infinite loop, batasi max 30 hari atau gunakan logic aman
+    while (loopDate <= end) {
+      const dateKey = loopDate.toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' }); 
       chartDataMap[dateKey] = 0;
+      loopDate.setDate(loopDate.getDate() + 1);
     }
 
-    // Isi data dari database
+    // Isi data
     ordersForGraph.forEach(order => {
-      const dateKey = new Date(order.createdAt).toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' });
-      // Pastikan key ada (untuk jaga-jaga timezone)
+      // Pastikan parsing tanggal order sesuai
+      const orderDate = new Date(order.createdAt);
+      const dateKey = orderDate.toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' });
+      
+      // Jika key ada di map (masuk range), tambahkan. Jika tidak (karena beda jam sedikit), abaikan atau masukkan ke tanggal terdekat
       if (chartDataMap[dateKey] !== undefined) {
         chartDataMap[dateKey] += Number(order.totalAmount);
+      } else {
+         // Fallback: kadang date string beda sedikit, kita bisa coba cari key manual atau biarkan (opsional)
       }
     });
 
-    // Ubah Object ke Array untuk Recharts
     const chartData = Object.keys(chartDataMap).map(key => ({
       name: key,
       total: chartDataMap[key],
     }));
 
-    // 3. DATA MENU TERLARIS (Tetap Sama)
+    // 5. Top Menu
     const topItems = await prisma.orderItem.groupBy({
       by: ['menuId'],
       _sum: { quantity: true },
@@ -77,7 +127,6 @@ export async function GET(req: NextRequest) { // Ubah param jadi NextRequest
       take: 5,
     });
 
-    // Ambil detail nama menu
     const menuIds = topItems.map(item => item.menuId);
     const menuDetails = await prisma.menu.findMany({
       where: { id: { in: menuIds } },
@@ -93,7 +142,7 @@ export async function GET(req: NextRequest) { // Ubah param jadi NextRequest
       };
     });
 
-    // 4. DATA PESANAN TERBARU (Tetap Sama)
+    // 6. Recent Orders
     const recentOrdersList = await prisma.order.findMany({
       take: 5,
       orderBy: { createdAt: 'desc' },
@@ -102,13 +151,12 @@ export async function GET(req: NextRequest) { // Ubah param jadi NextRequest
       }
     });
 
-    // Return semua data
     return NextResponse.json({
       revenue: revenue._sum.totalAmount || 0,
       totalOrders,
       totalCustomers,
       totalMenu,
-      chartData, // <--- Ini sekarang data dinamis sesuai tanggal
+      chartData, 
       topMenus,       
       recentOrdersList 
     });
