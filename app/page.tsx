@@ -137,19 +137,26 @@ export default function LandingPage() {
         </div>
       )}
 
-      {/* NAVBAR */}
+      {/* ===== 1. NAVBAR ===== */}
       <nav className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur-md shadow-sm transition-all">
         <div className="container mx-auto px-4 h-20 flex items-center justify-between relative">
+          
+          {/* LOGO & BRAND NAME (Kiri) */}
           <div className="flex-shrink-0 z-20">
             <Link href="/" className="flex items-center gap-3 group">
-              <div className="relative h-10 w-10 md:h-12 md:w-12 overflow-hidden rounded-full border-2 border-primary/20 group-hover:border-primary transition-colors duration-300">
+              {/* Gambar Logo */}
+              <div className="relative h-10 w-10 md:h-12 md:w-12 overflow-hidden rounded-full border-2 border-primary/20 group-hover:border-primary transition-colors duration-300 shadow-sm">
                 <Image src="/logo_dapuradida.jpeg" alt="Logo Dapur Adida" fill className="object-cover" />
               </div>
-              <span className="text-lg md:text-xl font-extrabold tracking-tight text-primary group-hover:opacity-90 transition-opacity hidden xs:block">
-                Dapur Adida.
+              
+              {/* TULISAN DAPUR ADIDA (Dipercantik) */}
+              <span className="text-xl md:text-2xl font-black tracking-tight text-slate-900 group-hover:text-primary transition-colors">
+                Dapur Adida<span className="text-primary">.</span>
               </span>
             </Link>
           </div>
+
+          {/* BAGIAN KANAN (User, Cart, Login - Tetap Sama) */}
           <div className="flex items-center gap-2 md:gap-3 z-20">
             {status === "loading" ? (
               <span className="text-xs md:text-sm text-slate-400 animate-pulse">Memuat...</span>
