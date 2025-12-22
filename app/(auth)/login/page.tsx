@@ -8,12 +8,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChefHat, Loader2 } from 'lucide-react';
+import { ChefHat, Loader2, Eye, EyeOff } from 'lucide-react'; // Tambahkan Eye dan EyeOff
 
 export default function LoginPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  
+  // State untuk toggle password
+  const [showPassword, setShowPassword] = useState(false);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -85,11 +88,37 @@ export default function LoginPage() {
               <div className="flex items-center">
                 <Label htmlFor="password">Kata Sandi</Label>
               </div>
-              <Input id="password" name="password" type="password" placeholder="Kata Sandi Anda" required disabled={isLoading} />
+              
+              {/* WRAPPER RELATIVE UNTUK INPUT PASSWORD */}
+              <div className="relative">
+                <Input 
+                  id="password" 
+                  name="password" 
+                  // Ubah tipe berdasarkan state showPassword
+                  type={showPassword ? "text" : "password"} 
+                  placeholder="Kata Sandi Anda" 
+                  required 
+                  disabled={isLoading} 
+                  className="pr-10" // Padding kanan agar teks tidak tertutup icon
+                />
+                
+                {/* TOMBOL TOGGLE PASSWORD */}
+                <button
+                  type="button" // Wajib type="button" agar tidak submit form
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-800 focus:outline-none"
+                  tabIndex={-1} // Agar tidak bisa difokus dengan tab (opsional)
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-5 w-5" />
+                  ) : (
+                    <Eye className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
             </div>
           </CardContent>
 
-          {/* PERBAIKAN: Ditambahkan 'pt-6' agar ada jarak dengan input password */}
           <CardFooter className="flex flex-col gap-3 pt-4">
             <Button className="w-full bg-slate-900 hover:bg-slate-800" disabled={isLoading}>
               {isLoading ? (

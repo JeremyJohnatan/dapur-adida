@@ -7,12 +7,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChefHat, Loader2 } from 'lucide-react';
+import { ChefHat, Loader2, Eye, EyeOff } from 'lucide-react'; // Import Icon Mata
 
 export default function RegisterPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // State untuk visibilitas password (terpisah antara password utama & konfirmasi)
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -21,14 +25,23 @@ export default function RegisterPage() {
 
     const formData = new FormData(event.currentTarget);
     const fullName = formData.get("fullname");
-    const username = formData.get("username"); // Ambil username
-    const password = formData.get("password");
+    const username = formData.get("username");
+    const password = formData.get("password") as string;
+    const confirmPassword = formData.get("confirmPassword") as string; // Ambil konfirmasi
     const phone = formData.get("phone");
+
+    // 1. VALIDASI MANUAL: Cek apakah password sama
+    if (password !== confirmPassword) {
+      setError("Kata sandi tidak cocok! Silakan periksa kembali.");
+      setIsLoading(false);
+      return; // Stop proses jika tidak sama
+    }
 
     try {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        // Kirim data ke backend (confirmPassword tidak perlu dikirim ke DB)
         body: JSON.stringify({ fullName, username, password, phone }),
       });
 
@@ -75,7 +88,6 @@ export default function RegisterPage() {
               <Input id="fullname" name="fullname" type="text" placeholder="Nama Lengkap" required disabled={isLoading} />
             </div>
             
-            {/* INPUT USERNAME (Pengganti Email) */}
             <div className="grid gap-2">
               <Label htmlFor="username">Username</Label>
               <Input 
@@ -88,9 +100,52 @@ export default function RegisterPage() {
               />
             </div>
 
+            {/* INPUT PASSWORD UTAMA */}
             <div className="grid gap-2">
               <Label htmlFor="password">Kata Sandi</Label>
-              <Input id="password" name="password" type="password" required disabled={isLoading} />
+              <div className="relative">
+                <Input 
+                  id="password" 
+                  name="password" 
+                  type={showPassword ? "text" : "password"} // Toggle Tipe
+                  required 
+                  disabled={isLoading} 
+                  placeholder="Minimal 6 karakter"
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-800 focus:outline-none"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
+            </div>
+
+            {/* INPUT KONFIRMASI PASSWORD (BARU) */}
+            <div className="grid gap-2">
+              <Label htmlFor="confirmPassword">Konfirmasi Kata Sandi</Label>
+              <div className="relative">
+                <Input 
+                  id="confirmPassword" 
+                  name="confirmPassword" 
+                  type={showConfirmPassword ? "text" : "password"} // Toggle Tipe Confirm
+                  required 
+                  disabled={isLoading} 
+                  placeholder="Ulangi kata sandi"
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-800 focus:outline-none"
+                  tabIndex={-1}
+                >
+                  {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
             </div>
             
             <div className="grid gap-2">
@@ -101,7 +156,11 @@ export default function RegisterPage() {
           
           <CardFooter className="flex flex-col gap-3 pt-4">
             <Button className="w-full bg-slate-900 hover:bg-slate-800" disabled={isLoading}>
-              {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Daftar Sekarang"}
+              {isLoading ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Mendaftar...</>
+              ) : (
+                "Daftar Sekarang"
+              )}
             </Button>
             <p className="text-sm text-center text-slate-500">
               Sudah punya akun?{' '}
