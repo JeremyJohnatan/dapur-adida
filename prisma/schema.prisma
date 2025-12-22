@@ -45,6 +45,7 @@ model User {
   orders        Order[]
   sentChats     Chat[]    @relation("SentChats")
   receivedChats Chat[]    @relation("ReceivedChats")
+  reviews       Review[]
 }
 
 model Menu {
@@ -55,9 +56,11 @@ model Menu {
   imageUrl    String?
   isAvailable Boolean   @default(true)
   isFeatured  Boolean   @default(false)
+  stock       Int       @default(0)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   orderItems  OrderItem[]
+  reviews     Review[]
 }
 
 model Order {
@@ -111,4 +114,16 @@ model Chat {
   sender     User     @relation("SentChats", fields: [senderId], references: [id])
   receiverId String
   receiver   User     @relation("ReceivedChats", fields: [receiverId], references: [id])
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  menuId    String
+  menu      Menu     @relation(fields: [menuId], references: [id])
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

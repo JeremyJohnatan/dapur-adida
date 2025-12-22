@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
+import { pusherServer } from "@/lib/pusher";
 
 export const dynamic = "force-dynamic"; 
 
@@ -60,6 +61,12 @@ export async function PATCH(request: Request) {
     const updatedOrder = await prisma.order.update({
       where: { id: orderId },
       data: { status: status },
+    });
+
+    await pusherServer.trigger(`order-updates-${updatedOrder.userId}`, 'status-update', {
+      orderId: updatedOrder.id,
+      status: updatedOrder.status,
+      message: `Status pesanan Anda telah diupdate ke ${updatedOrder.status}`,
     });
 
     return NextResponse.json(updatedOrder);

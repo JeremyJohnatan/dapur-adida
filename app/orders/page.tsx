@@ -22,8 +22,10 @@ import {
   User, 
   LogOut,
   CreditCard, 
-  RefreshCcw 
+  RefreshCcw,
+  Star
 } from "lucide-react";
+import { pusherClient } from "@/lib/pusher";
 
 import {
   AlertDialog,
@@ -37,11 +39,21 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+
+import { Textarea } from "@/components/ui/textarea";
+
 interface OrderItem {
   id: string;
   quantity: number;
   price: string;
-  menu: { name: string; imageUrl: string };
+  menu: { id: string; name: string; imageUrl: string };
 }
 
 interface Payment {
@@ -65,6 +77,13 @@ export default function OrderHistoryPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [checkingId, setCheckingId] = useState<string | null>(null);
+
+  // State untuk Review Modal
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<OrderItem | null>(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState("");
+  const [submittingReview, setSubmittingReview] = useState(false);
 
   // Cek Login
   useEffect(() => {
@@ -92,6 +111,45 @@ export default function OrderHistoryPage() {
     fetchOrders();
   }, [fetchOrders]);
 
+  // Subscribe ke Pusher untuk notifikasi real-time
+  useEffect(() => {
+    if (session?.user?.id) {
+      const channel = pusherClient.subscribe(`order-updates-${session.user.id}`);
+
+      channel.bind('status-update', (data: any) => {
+        setOrders((prevOrders) =>
+          prevOrders.map((order) =>
+            order.id === data.orderId ? { ...order, status: data.status } : order
+          )
+        );
+        alert(data.message);
+      });
+
+      return () => {
+        pusherClient.unsubscribe(`order-updates-${session.user.id}`);
+      };
+    }
+  }, [session]);
+
+  useEffect(() => {
+    if (session?.user?.id) {
+      const channel = pusherClient.subscribe(`order-updates-${session.user.id}`);
+
+      channel.bind('status-update', (data: any) => {
+        setOrders((prevOrders) =>
+          prevOrders.map((order) =>
+            order.id === data.orderId ? { ...order, status: data.status } : order
+          )
+        );
+        alert(data.message);
+      });
+
+      return () => {
+        pusherClient.unsubscribe(`order-updates-${session.user.id}`);
+      };
+    }
+  }, [session]);
+
   // --- FUNGSI CEK STATUS ---
   const handleCheckPayment = async (orderId: string, manual: boolean = true) => {
     if (manual) setCheckingId(orderId); 
@@ -118,7 +176,39 @@ export default function OrderHistoryPage() {
     }
   };
 
-  // --- AUTO CHECK ---
+  // --- FUNGSI REVIEW ---
+  const handleReviewSubmit = async () => {
+    if (!selectedItem) return;
+    setSubmittingReview(true);
+    try {
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          menuId: selectedItem.menu.id,
+          rating: reviewRating,
+          comment: reviewComment,
+        }),
+      });
+      if (res.ok) {
+        alert("Review berhasil dikirim!");
+        setReviewModalOpen(false);
+        setReviewComment("");
+        setReviewRating(5);
+      } else {
+        alert("Gagal mengirim review.");
+      }
+    } catch (error) {
+      alert("Terjadi kesalahan.");
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
+  const openReviewModal = (item: OrderItem) => {
+    setSelectedItem(item);
+    setReviewModalOpen(true);
+  };
   useEffect(() => {
     if (orders.length > 0) {
       const latestPendingOrder = orders.find(o => o.status === "PENDING");
@@ -259,6 +349,16 @@ export default function OrderHistoryPage() {
                         </div>
                         <div className="text-right">
                           <p className="font-bold text-slate-800 text-sm">{formatRupiah(Number(item.price) * item.quantity)}</p>
+                          {order.status === "COMPLETED" && (
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="mt-1 text-xs h-6"
+                              onClick={() => openReviewModal(item)}
+                            >
+                              <Star className="h-3 w-3 mr-1" /> Beri Review
+                            </Button>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -303,6 +403,47 @@ export default function OrderHistoryPage() {
           </div>
         )}
       </main>
+
+      {/* Modal Review */}
+      <Dialog open={reviewModalOpen} onOpenChange={setReviewModalOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Beri Review untuk {selectedItem?.menu.name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">Rating</label>
+              <div className="flex gap-1">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    onClick={() => setReviewRating(star)}
+                    className={`text-2xl ${star <= reviewRating ? 'text-yellow-400' : 'text-gray-300'}`}
+                  >
+                    ★
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">Komentar (Opsional)</label>
+              <Textarea
+                value={reviewComment}
+                onChange={(e) => setReviewComment(e.target.value)}
+                placeholder="Bagaimana pendapat Anda tentang menu ini?"
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReviewModalOpen(false)}>Batal</Button>
+            <Button onClick={handleReviewSubmit} disabled={submittingReview}>
+              {submittingReview ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Kirim Review
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

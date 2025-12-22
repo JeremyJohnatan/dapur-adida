@@ -41,6 +41,26 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+
 // Interface Menu
 interface Menu {
   id: string;
@@ -49,7 +69,9 @@ interface Menu {
   price: string | number;
   imageUrl: string | null;
   isAvailable: boolean;
-  isFeatured: boolean; 
+  isFeatured: boolean;
+  stock: number;
+  averageRating?: number;
 }
 
 export default function LandingPage() {
@@ -61,6 +83,16 @@ export default function LandingPage() {
   const [loadingMenu, setLoadingMenu] = useState(true);
   
   const [notification, setNotification] = useState<{message: string, show: boolean} | null>(null);
+
+  // State untuk Edit Profile Modal
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [profileData, setProfileData] = useState({
+    username: "",
+    password: "",
+    address: "",
+    phoneNumber: "",
+  });
+  const [updatingProfile, setUpdatingProfile] = useState(false);
 
   useEffect(() => {
     if (!session?.user) return;
@@ -77,6 +109,18 @@ export default function LandingPage() {
     };
   }, [session]);
 
+  // Load profile data
+  useEffect(() => {
+    if (session?.user) {
+      setProfileData({
+        username: session.user.username || "",
+        password: "",
+        address: session.user.address || "",
+        phoneNumber: session.user.phoneNumber || "",
+      });
+    }
+  }, [session]);
+
   // --- LOGIC FETCH DATA (DIPERBAIKI: HANYA 3 MENU TERLARIS) ---
   useEffect(() => {
     const fetchMenus = async () => {
@@ -85,11 +129,20 @@ export default function LandingPage() {
         const data = await res.json();
         
         if (Array.isArray(data)) {
+            // Fetch average rating untuk setiap menu
+            const menusWithRating = await Promise.all(
+              data.map(async (menu: Menu) => {
+                const reviewRes = await fetch(`/api/reviews/${menu.id}`);
+                const reviewData = await reviewRes.json();
+                return { ...menu, averageRating: reviewData.averageRating };
+              })
+            );
+            
             // A. Menu Rekomendasi (Yang dibintang)
-            const starred = data.filter((item: Menu) => item.isFeatured === true);
+            const starred = menusWithRating.filter((item: Menu) => item.isFeatured === true);
             
             // B. Menu Terlaris (Sisanya yang tidak dibintang)
-            const others = data.filter((item: Menu) => item.isFeatured !== true);
+            const others = menusWithRating.filter((item: Menu) => item.isFeatured !== true);
 
             setRecommendedMenus(starred); 
             
@@ -97,7 +150,7 @@ export default function LandingPage() {
             if (others.length > 0) {
                 setFeaturedMenus(others.slice(0, 3)); // <-- Cuma ambil 3
             } else {
-                setFeaturedMenus(data.slice(0, 3)); // Fallback cuma ambil 3
+                setFeaturedMenus(menusWithRating.slice(0, 3)); // Fallback cuma ambil 3
             }
         }
       } catch (error) {
@@ -118,6 +171,30 @@ export default function LandingPage() {
   };
 
   const isAdmin = session?.user?.role === "ADMIN";
+
+  // Handle Update Profile
+  const handleUpdateProfile = async () => {
+    setUpdatingProfile(true);
+    try {
+      const res = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(profileData),
+      });
+      if (res.ok) {
+        alert("Profile berhasil diupdate!");
+        setProfileModalOpen(false);
+        // Refresh session
+        window.location.reload();
+      } else {
+        alert("Gagal update profile.");
+      }
+    } catch (error) {
+      alert("Terjadi kesalahan.");
+    } finally {
+      setUpdatingProfile(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans relative">
@@ -333,22 +410,36 @@ export default function LandingPage() {
                       <Badge className="absolute top-4 left-4 bg-orange-500 text-white border-none shadow-sm backdrop-blur-sm px-3 py-1 font-bold">
                         HOT 🔥
                       </Badge>
+                      {(!menu.isAvailable || menu.stock <= 0) && (
+                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center backdrop-blur-sm z-10">
+                          <Badge variant="destructive" className="text-lg px-6 py-2 font-bold uppercase tracking-widest shadow-lg">Sold Out</Badge>
+                        </div>
+                      )}
                     </div>
                     <CardContent className="p-6">
                       <div className="flex justify-between items-start mb-2 gap-2">
                         <h3 className="font-bold text-lg text-slate-900 group-hover:text-primary transition-colors line-clamp-1">{menu.name}</h3>
-                        <div className="flex items-center gap-1 text-amber-500 text-xs font-bold bg-amber-50 px-2 py-1 rounded-md border border-amber-100 shrink-0">
-                          <Star className="h-3 w-3 fill-current" /> 5.0
-                        </div>
+                        {menu.stock <= 0 ? (
+                          <Badge variant="destructive" className="text-xs px-2 py-1 font-bold">Sold Out</Badge>
+                        ) : (
+                          <div className="flex items-center gap-1 text-amber-500 text-xs font-bold bg-amber-50 px-2 py-1 rounded-md border border-amber-100 shrink-0">
+                            <Star className="h-3 w-3 fill-current" /> {menu.averageRating?.toFixed(1) || 0}
+                          </div>
+                        )}
                       </div>
                       <p className="text-slate-500 text-sm mb-6 line-clamp-2 h-10 leading-relaxed">
                         {menu.description || "Menu lezat khas Dapur Adida."}
                       </p>
+                      <div className="mb-2 text-xs text-slate-600">
+                        {menu.stock > 0 ? `Tersedia: ${menu.stock}` : <span className="text-red-600 font-bold">Stok Habis</span>}
+                      </div>
                       <div className="flex justify-between items-center">
                         <span className="font-black text-lg text-slate-900">{formatRupiah(menu.price)}</span>
                         <Link href={session ? "/menu" : "/login"}>
-                          <Button size="sm" disabled={!menu.isAvailable} className="rounded-full h-9 px-5 bg-primary hover:bg-primary/90 text-white shadow-md hover:shadow-lg hover:shadow-primary/20 transition-all font-bold">
-                            Pesan
+                          <Button size="sm" disabled={!menu.isAvailable || menu.stock <= 0} className={`rounded-full h-9 px-5 shadow-md hover:shadow-lg hover:shadow-primary/20 transition-all font-bold ${
+                            menu.stock <= 0 ? "bg-gray-400 text-gray-700 cursor-not-allowed" : "bg-primary hover:bg-primary/90 text-white"
+                          }`}>
+                            {menu.stock <= 0 ? "Sold Out" : "Pesan"}
                           </Button>
                         </Link>
                       </div>
@@ -391,22 +482,36 @@ export default function LandingPage() {
                     <Badge className="absolute top-4 left-4 bg-white/90 text-primary hover:bg-white border-none shadow-sm backdrop-blur-sm px-3 py-1 font-bold">
                       Terlaris
                     </Badge>
+                    {(!menu.isAvailable || menu.stock <= 0) && (
+                      <div className="absolute inset-0 bg-black/60 flex items-center justify-center backdrop-blur-sm z-10">
+                        <Badge variant="destructive" className="text-lg px-6 py-2 font-bold uppercase tracking-widest shadow-lg">Sold Out</Badge>
+                      </div>
+                    )}
                   </div>
                   <CardContent className="p-6">
                     <div className="flex justify-between items-start mb-2 gap-2">
                       <h3 className="font-bold text-lg text-slate-900 group-hover:text-primary transition-colors line-clamp-1">{menu.name}</h3>
-                      <div className="flex items-center gap-1 text-amber-500 text-xs font-bold bg-amber-50 px-2 py-1 rounded-md border border-amber-100 shrink-0">
-                        <Star className="h-3 w-3 fill-current" /> 4.8
-                      </div>
+                      {menu.stock <= 0 ? (
+                        <Badge variant="destructive" className="text-xs px-2 py-1 font-bold">Sold Out</Badge>
+                      ) : (
+                        <div className="flex items-center gap-1 text-amber-500 text-xs font-bold bg-amber-50 px-2 py-1 rounded-md border border-amber-100 shrink-0">
+                          <Star className="h-3 w-3 fill-current" /> {menu.averageRating?.toFixed(1) || 0}
+                        </div>
+                      )}
                     </div>
                     <p className="text-slate-500 text-sm mb-6 line-clamp-2 h-10 leading-relaxed">
                       {menu.description || "Menu lezat khas Dapur Adida."}
                     </p>
+                    <div className="mb-2 text-xs text-slate-600">
+                      {menu.stock > 0 ? `Tersedia: ${menu.stock}` : <span className="text-red-600 font-bold">Stok Habis</span>}
+                    </div>
                     <div className="flex justify-between items-center">
                       <span className="font-black text-lg text-slate-900">{formatRupiah(menu.price)}</span>
                       <Link href={session ? "/menu" : "/login"}>
-                        <Button size="sm" disabled={!menu.isAvailable} className="rounded-full h-9 px-5 bg-primary hover:bg-primary/90 text-white shadow-md hover:shadow-lg hover:shadow-primary/20 transition-all font-bold">
-                          Pesan
+                        <Button size="sm" disabled={!menu.isAvailable || menu.stock <= 0} className={`rounded-full h-9 px-5 shadow-md hover:shadow-lg hover:shadow-primary/20 transition-all font-bold ${
+                          menu.stock <= 0 ? "bg-gray-400 text-gray-700 cursor-not-allowed" : "bg-primary hover:bg-primary/90 text-white"
+                        }`}>
+                          {menu.stock <= 0 ? "Sold Out" : "Pesan"}
                         </Button>
                       </Link>
                     </div>

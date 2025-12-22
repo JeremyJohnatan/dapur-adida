@@ -44,6 +44,17 @@ export default function CartPage() {
     setIsCheckingOut(true);
 
     try {
+      // Tambahan: Validasi stock sebelum checkout
+      for (const item of items) {
+        const menuRes = await fetch(`/api/menus/${item.id}`);
+        const menu = await menuRes.json();
+        if (item.quantity > menu.stock) {
+          alert(`Stok ${menu.name} tidak cukup. Tersedia: ${menu.stock}`);
+          setIsCheckingOut(false);
+          return;
+        }
+      }
+
       // DEBUG: Cek di console browser (F12) apakah note ada isinya
       console.log("Mengirim Order dengan Note:", note);
 

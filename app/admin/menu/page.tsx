@@ -24,6 +24,7 @@ interface Menu {
   imageUrl: string;
   isAvailable: boolean;
   isFeatured: boolean; // <--- Tambahan Field
+  stock: number;
 }
 
 export default function AdminMenuPage() {
@@ -45,7 +46,8 @@ export default function AdminMenuPage() {
     price: "",
     imageUrl: "",
     isAvailable: true,
-    isFeatured: false // <--- Tambahan State
+    isFeatured: false, // <--- Tambahan State
+    stock: 0
   });
 
   // State File Upload
@@ -104,7 +106,7 @@ export default function AdminMenuPage() {
 
   // --- CRUD HANDLERS ---
   const resetForm = () => {
-    setFormData({ id: "", name: "", description: "", price: "", imageUrl: "", isAvailable: true, isFeatured: false });
+    setFormData({ id: "", name: "", description: "", price: "", imageUrl: "", isAvailable: true, isFeatured: false, stock: 0 });
     setSelectedFile(null);
     setPreviewUrl(null);
     setIsEditing(false);
@@ -118,7 +120,8 @@ export default function AdminMenuPage() {
       price: menu.price.toString(),
       imageUrl: menu.imageUrl || "",
       isAvailable: menu.isAvailable,
-      isFeatured: menu.isFeatured // Load status featured
+      isFeatured: menu.isFeatured, // Load status featured
+      stock: menu.stock
     });
     setPreviewUrl(menu.imageUrl); 
     setSelectedFile(null); 
@@ -201,7 +204,22 @@ export default function AdminMenuPage() {
     }
   };
 
-  const filteredMenus = menus.filter(m => m.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredMenus = menus
+    .filter(m => m.name.toLowerCase().includes(searchTerm.toLowerCase()))
+    .sort((a, b) => {
+      // Featured first
+      if (a.isFeatured && !b.isFeatured) return -1;
+      if (!a.isFeatured && b.isFeatured) return 1;
+      
+      // Then available with stock
+      const aAvailable = a.isAvailable && a.stock > 0;
+      const bAvailable = b.isAvailable && b.stock > 0;
+      if (aAvailable && !bAvailable) return -1;
+      if (!aAvailable && bAvailable) return 1;
+      
+      // Alphabetical by name
+      return a.name.localeCompare(b.name);
+    });
   const formatRupiah = (price: string) => {
     return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(Number(price));
   };
@@ -236,7 +254,7 @@ export default function AdminMenuPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredMenus.map((menu) => (
-            <Card key={menu.id} className={`overflow-hidden group hover:shadow-lg transition-all border-slate-200 ${menu.isFeatured ? 'ring-2 ring-orange-400' : ''}`}>
+            <Card key={menu.id} className={`overflow-hidden group hover:shadow-lg transition-all border-slate-200 ${menu.isFeatured ? 'ring-2 ring-orange-400' : ''} ${(!menu.isAvailable || menu.stock <= 0) ? 'ring-2 ring-red-400 bg-red-50' : ''}`}>
               <div className="relative h-48 bg-slate-100">
                 {menu.imageUrl ? (
                   <Image src={menu.imageUrl} alt={menu.name} fill className="object-cover" />
@@ -263,9 +281,11 @@ export default function AdminMenuPage() {
                     <Star className={`h-5 w-5 ${menu.isFeatured ? "text-orange-500 fill-orange-500" : "text-slate-300"}`} />
                 </button>
 
-                {!menu.isAvailable && (
+                {(!menu.isAvailable || menu.stock <= 0) && (
                   <div className="absolute inset-0 bg-black/50 flex items-center justify-center pointer-events-none">
-                    <Badge variant="destructive">Habis</Badge>
+                    <Badge variant="destructive" className="text-lg px-6 py-2 font-bold uppercase tracking-widest shadow-lg">
+                      {menu.stock <= 0 ? "Stok Habis" : "Tidak Tersedia"}
+                    </Badge>
                   </div>
                 )}
               </div>
@@ -275,11 +295,19 @@ export default function AdminMenuPage() {
                   <span className="font-bold text-primary text-sm">{formatRupiah(menu.price)}</span>
                 </div>
                 <p className="text-slate-500 text-xs line-clamp-2 h-8">{menu.description}</p>
+                <div className="mt-2 text-xs text-slate-600">
+                  Stok: {menu.stock > 0 ? menu.stock : <span className="text-red-600 font-bold">Habis</span>}
+                </div>
                 
                 {menu.isFeatured && (
                     <div className="mt-3 flex items-center gap-1 text-[10px] font-bold text-orange-600 bg-orange-50 w-fit px-2 py-1 rounded-full">
                         <Star className="h-3 w-3 fill-current"/> Rekomendasi Spesial
                     </div>
+                )}
+                {(!menu.isAvailable || menu.stock <= 0) && (
+                  <div className="mt-2 flex items-center gap-1 text-[10px] font-bold text-red-600 bg-red-50 w-fit px-2 py-1 rounded-full">
+                    ⚠️ Perlu Perhatian
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -305,16 +333,21 @@ export default function AdminMenuPage() {
                 <Input id="price" type="number" required value={formData.price} onChange={(e) => setFormData({...formData, price: e.target.value})} placeholder="25000" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="status">Ketersediaan</Label>
-                <select 
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
-                  value={formData.isAvailable ? "true" : "false"}
-                  onChange={(e) => setFormData({...formData, isAvailable: e.target.value === "true"})}
-                >
-                  <option value="true">Tersedia</option>
-                  <option value="false">Habis</option>
-                </select>
+                <Label htmlFor="stock">Stok</Label>
+                <Input id="stock" type="number" required value={formData.stock} onChange={(e) => setFormData({...formData, stock: Number(e.target.value)})} placeholder="10" />
               </div>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="status">Ketersediaan</Label>
+              <select 
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                value={formData.isAvailable ? "true" : "false"}
+                onChange={(e) => setFormData({...formData, isAvailable: e.target.value === "true"})}
+              >
+                <option value="true">Tersedia</option>
+                <option value="false">Habis</option>
+              </select>
             </div>
 
             <div className="space-y-2">

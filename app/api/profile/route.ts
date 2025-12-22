@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
+import bcrypt from "bcryptjs";
 
 
 // GET: Ambil Data Profil User
@@ -34,18 +35,20 @@ export async function PATCH(request: Request) {
 
   try {
     const body = await request.json();
-    const { fullName, phoneNumber, address } = body;
+    const { username, password, address, phoneNumber } = body;
+
+    const updateData: any = {};
+    if (username) updateData.username = username;
+    if (password) updateData.password = await bcrypt.hash(password, 10);
+    if (address !== undefined) updateData.address = address;
+    if (phoneNumber !== undefined) updateData.phoneNumber = phoneNumber;
 
     const updatedUser = await prisma.user.update({
       where: { id: session.user.id },
-      data: {
-        fullName,
-        phoneNumber,
-        address,
-      },
+      data: updateData,
     });
 
-    return NextResponse.json(updatedUser);
+    return NextResponse.json({ message: "Profile updated" });
   } catch (error) {
     console.error("Update Profile Error:", error);
     return NextResponse.json({ message: "Gagal update profil" }, { status: 500 });

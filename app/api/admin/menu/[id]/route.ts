@@ -33,6 +33,7 @@ export async function PATCH(
         imageUrl: body.imageUrl,
         isAvailable: body.isAvailable,
         isFeatured: body.isFeatured,
+        stock: body.stock ? Number(body.stock) : undefined,
       },
     });
 

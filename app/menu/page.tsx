@@ -17,11 +17,15 @@ interface Menu {
   price: string | number;
   imageUrl: string | null;
   isAvailable: boolean;
+  stock: number;
+  averageRating?: number;
 }
 
 export default function MenuPage() {
   const [menus, setMenus] = useState<Menu[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reviews, setReviews] = useState<Record<string, any[]>>({});
+  const [showReviews, setShowReviews] = useState<Record<string, boolean>>({});
   
   const { addToCart, totalItems } = useCart(); 
 
@@ -37,7 +41,14 @@ export default function MenuPage() {
       try {
         const res = await fetch("/api/menus");
         const data = await res.json();
-        setMenus(data);
+        const menusWithRating = await Promise.all(
+          data.map(async (menu: Menu) => {
+            const reviewRes = await fetch(`/api/reviews/${menu.id}`);
+            const reviewData = await reviewRes.json();
+            return { ...menu, averageRating: reviewData.averageRating };
+          })
+        );
+        setMenus(menusWithRating);
       } catch (error) {
         console.error("Gagal ambil menu", error);
       } finally {
@@ -50,6 +61,10 @@ export default function MenuPage() {
 
   // --- FUNGSI HANDLE ADD TO CART ---
   const handleAddToCart = (menu: any) => {
+    if (menu.stock <= 0) {
+      alert("Stok menu ini habis!");
+      return;
+    }
     // 1. Masukkan ke Context
     addToCart(menu);
 
@@ -70,6 +85,16 @@ export default function MenuPage() {
     setTimeout(() => {
       setAddedItems((prev) => ({ ...prev, [menu.id]: false }));
     }, 1000);
+  };
+
+  // Fungsi untuk toggle reviews
+  const toggleReviews = async (menuId: string) => {
+    if (!reviews[menuId]) {
+      const res = await fetch(`/api/reviews/${menuId}`);
+      const data = await res.json();
+      setReviews((prev) => ({ ...prev, [menuId]: data.reviews }));
+    }
+    setShowReviews((prev) => ({ ...prev, [menuId]: !prev[menuId] }));
   };
 
   const formatRupiah = (price: string | number) => {
@@ -147,9 +172,9 @@ export default function MenuPage() {
                     </div>
                   )}
                   
-                  {!menu.isAvailable && (
+                  {(!menu.isAvailable || menu.stock <= 0) && (
                     <div className="absolute inset-0 bg-black/60 flex items-center justify-center backdrop-blur-sm z-10">
-                      <Badge variant="destructive" className="text-lg px-6 py-2 font-bold uppercase tracking-widest shadow-lg">Habis</Badge>
+                      <Badge variant="destructive" className="text-lg px-6 py-2 font-bold uppercase tracking-widest shadow-lg">Sold Out</Badge>
                     </div>
                   )}
                 </div>
@@ -157,14 +182,54 @@ export default function MenuPage() {
                 <CardContent className="p-6">
                   <div className="flex justify-between items-start mb-3 gap-2">
                     <h3 className="font-bold text-lg text-slate-900 line-clamp-1 group-hover:text-primary transition-colors">{menu.name}</h3>
-                    <div className="flex items-center gap-1 text-amber-500 text-xs font-bold bg-amber-50 px-2 py-1 rounded-md border border-amber-100 shrink-0">
-                      <Star className="h-3 w-3 fill-current" /> 4.8
-                    </div>
+                    {menu.stock <= 0 ? (
+                      <Badge variant="destructive" className="text-xs px-2 py-1 font-bold">Sold Out</Badge>
+                    ) : (
+                      <div className="flex items-center gap-1 text-amber-500 text-xs font-bold bg-amber-50 px-2 py-1 rounded-md border border-amber-100 shrink-0">
+                        <Star className="h-3 w-3 fill-current" /> {menu.averageRating?.toFixed(1) || 0}
+                      </div>
+                    )}
                   </div>
                   
                   <p className="text-slate-500 text-sm mb-6 line-clamp-2 h-10 leading-relaxed">
                     {menu.description || "Menu spesial dengan cita rasa otentik khas Dapur Adida."}
                   </p>
+                  <div className="mb-2 text-xs text-slate-600">
+                    {menu.stock > 0 ? `Tersedia: ${menu.stock}` : <span className="text-red-600 font-bold">Stok Habis</span>}
+                  </div>
+                  
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center">
+                      {[...Array(5)].map((_, i) => (
+                        <Star
+                          key={i}
+                          className={`w-4 h-4 ${i < (menu.averageRating || 0) ? 'text-yellow-400 fill-current' : 'text-gray-300'}`}
+                        />
+                      ))}
+                      <span className="ml-1 text-sm text-gray-600">({menu.averageRating?.toFixed(1) || 0})</span>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => toggleReviews(menu.id)}>
+                      Lihat Reviews
+                    </Button>
+                  </div>
+                  {showReviews[menu.id] && (
+                    <div className="mt-2">
+                      {reviews[menuId]?.map((review) => (
+                        <div key={review.id} className="border-t pt-2">
+                          <div className="flex items-center">
+                            {[...Array(5)].map((_, i) => (
+                              <Star
+                                key={i}
+                                className={`w-3 h-3 ${i < review.rating ? 'text-yellow-400 fill-current' : 'text-gray-300'}`}
+                              />
+                            ))}
+                            <span className="ml-1 text-xs text-gray-600">{review.user.fullName}</span>
+                          </div>
+                          <p className="text-sm">{review.comment}</p>
+                        </div>
+                      )) || <p className="text-sm text-gray-500">Belum ada review.</p>}
+                    </div>
+                  )}
                   
                   <div className="flex justify-between items-center pt-4 border-t border-slate-100">
                     <span className="font-black text-xl text-primary">
@@ -174,15 +239,19 @@ export default function MenuPage() {
                     {/* Tombol Tambah dengan Efek Ganti Teks */}
                     <Button 
                       size="sm" 
-                      disabled={!menu.isAvailable}
+                      disabled={!menu.isAvailable || menu.stock <= 0}
                       onClick={() => handleAddToCart(menu)} 
                       className={`rounded-full px-6 transition-all font-bold h-10 shadow-lg active:scale-95 duration-300 ${
-                        addedItems[menu.id] 
-                          ? "bg-green-600 hover:bg-green-700 text-white w-32" 
-                          : "bg-primary hover:bg-primary/90 text-white shadow-primary/20 hover:shadow-primary/30 w-28"
+                        menu.stock <= 0
+                          ? "bg-gray-400 text-gray-700 cursor-not-allowed"
+                          : addedItems[menu.id] 
+                            ? "bg-green-600 hover:bg-green-700 text-white w-32" 
+                            : "bg-primary hover:bg-primary/90 text-white shadow-primary/20 hover:shadow-primary/30 w-28"
                       }`}
                     >
-                      {addedItems[menu.id] ? (
+                      {menu.stock <= 0 ? (
+                        "Sold Out"
+                      ) : addedItems[menu.id] ? (
                          <>
                            <Check className="h-4 w-4 mr-1 animate-in zoom-in spin-in-90 duration-300" /> Masuk
                          </>

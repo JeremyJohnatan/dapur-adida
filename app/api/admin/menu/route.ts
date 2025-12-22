@@ -34,6 +34,7 @@ export async function POST(request: Request) {
         price: Number(body.price), // Konversi ke Number agar tidak error
         imageUrl: body.imageUrl,
         isAvailable: body.isAvailable ?? true,
+        stock: Number(body.stock) ?? 0,
       },
     });
 
