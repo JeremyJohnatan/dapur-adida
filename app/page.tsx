@@ -26,7 +26,8 @@ import {
   LayoutDashboard,
   Instagram, 
   Phone,
-  Flame 
+  Flame,
+  Settings 
 } from "lucide-react";
 
 import {
@@ -121,7 +122,7 @@ export default function LandingPage() {
     }
   }, [session]);
 
-  // --- LOGIC FETCH DATA (DIPERBAIKI: HANYA 3 MENU TERLARIS) ---
+  // --- LOGIC FETCH DATA ---
   useEffect(() => {
     const fetchMenus = async () => {
       try {
@@ -148,9 +149,9 @@ export default function LandingPage() {
             
             // LOGIC FIX: HANYA AMBIL 3 MENU UTAMA
             if (others.length > 0) {
-                setFeaturedMenus(others.slice(0, 3)); // <-- Cuma ambil 3
+                setFeaturedMenus(others.slice(0, 3)); 
             } else {
-                setFeaturedMenus(menusWithRating.slice(0, 3)); // Fallback cuma ambil 3
+                setFeaturedMenus(menusWithRating.slice(0, 3)); 
             }
         }
       } catch (error) {
@@ -226,14 +227,14 @@ export default function LandingPage() {
                 <Image src="/logo_dapuradida.jpeg" alt="Logo Dapur Adida" fill className="object-cover" />
               </div>
               
-              {/* TULISAN DAPUR ADIDA (Dipercantik) */}
+              {/* TULISAN DAPUR ADIDA */}
               <span className="text-xl md:text-2xl font-black tracking-tight text-slate-900 group-hover:text-primary transition-colors">
                 Dapur Adida<span className="text-primary">.</span>
               </span>
             </Link>
           </div>
 
-          {/* BAGIAN KANAN (User, Cart, Login - Tetap Sama) */}
+          {/* BAGIAN KANAN */}
           <div className="flex items-center gap-2 md:gap-3 z-20">
             {status === "loading" ? (
               <span className="text-xs md:text-sm text-slate-400 animate-pulse">Memuat...</span>
@@ -261,27 +262,50 @@ export default function LandingPage() {
                     </span>
                   )}
                 </Link>
-                <div className="hidden md:flex items-center gap-2 text-sm font-bold text-slate-600 bg-slate-100 px-4 py-2 rounded-full">
-                  <User className="h-4 w-4" />
-                  <span className="capitalize truncate max-w-[100px]">{session.user?.name || "Kakak"}</span>
-                </div>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="ghost" size="icon" className="rounded-full text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all" title="Keluar">
-                      <LogOut className="h-5 w-5" /> 
+
+                {/* === MODIFIED: DROPDOWN MENU PROFILE === */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="flex items-center gap-2 text-sm font-bold text-slate-600 bg-slate-100 pl-3 pr-4 py-2 rounded-full hover:bg-slate-200 transition-colors">
+                      <User className="h-4 w-4" />
+                      <span className="capitalize truncate max-w-[100px] hidden md:inline">{session.user?.name || "Kakak"}</span>
                     </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Konfirmasi Keluar</AlertDialogTitle>
-                      <AlertDialogDescription>Apakah Anda yakin ingin keluar dari akun?</AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Batal</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => signOut({ callbackUrl: "/" })} className="bg-red-600 hover:bg-red-700 focus:ring-red-600 text-white">Ya, Keluar</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56 bg-white border-slate-100 shadow-xl">
+                    <DropdownMenuLabel className="font-bold text-slate-900">Akun Saya</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <Link href="/profile">
+                      <DropdownMenuItem className="cursor-pointer focus:bg-slate-50 focus:text-primary font-medium">
+                        <User className="mr-2 h-4 w-4" />
+                        <span>Profile</span>
+                      </DropdownMenuItem>
+                    </Link>
+                    <DropdownMenuSeparator />
+                    
+                    {/* Logout Logic inside Dropdown */}
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-red-600 cursor-pointer focus:text-red-600 focus:bg-red-50 font-medium">
+                          <LogOut className="mr-2 h-4 w-4" />
+                          <span>Keluar</span>
+                        </DropdownMenuItem>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Konfirmasi Keluar</AlertDialogTitle>
+                          <AlertDialogDescription>Apakah Anda yakin ingin keluar dari akun?</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Batal</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => signOut({ callbackUrl: "/" })} className="bg-red-600 hover:bg-red-700 focus:ring-red-600 text-white">Ya, Keluar</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                {/* === END MODIFIED === */}
+
               </div>
             ) : (
               <>
@@ -376,7 +400,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* REKOMENDASI SPESIAL (ADMIN CHOICE) - TAMPILKAN JIKA ADA DATA */}
+      {/* REKOMENDASI SPESIAL (ADMIN CHOICE) */}
       {recommendedMenus.length > 0 && (
         <section className="py-20 bg-gradient-to-b from-white to-slate-50">
           <div className="container mx-auto px-4">
@@ -533,7 +557,7 @@ export default function LandingPage() {
             <div>
               <div className="flex items-center gap-3 mb-6 text-white">
                 <div className="relative h-12 w-12 overflow-hidden rounded-full border-2 border-slate-600">
-                   <Image src="/logo_dapuradida.jpeg" alt="Logo Footer" fill className="object-cover" />
+                    <Image src="/logo_dapuradida.jpeg" alt="Logo Footer" fill className="object-cover" />
                 </div>
                 <span className="text-2xl font-bold tracking-tight">Dapur Adida.</span>
               </div>

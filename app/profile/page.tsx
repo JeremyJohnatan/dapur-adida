@@ -8,8 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea"; // Pastikan install textarea: pnpm dlx shadcn@latest add textarea
-import { Loader2, ArrowLeft, Save, User, MapPin, Phone } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea"; 
+import { Loader2, ArrowLeft, Save, User, MapPin, Phone, Lock, KeyRound, ShieldAlert } from "lucide-react";
 
 export default function ProfilePage() {
   const { data: session, status } = useSession();
@@ -20,9 +20,12 @@ export default function ProfilePage() {
   
   const [formData, setFormData] = useState({
     fullName: "",
-    username: "", // Read only
+    username: "", 
     phoneNumber: "",
     address: "",
+    oldPassword: "", // INPUT BARU
+    password: "", 
+    confirmPassword: ""
   });
 
   // Redirect jika belum login
@@ -38,12 +41,13 @@ export default function ProfilePage() {
           const res = await fetch("/api/profile");
           const data = await res.json();
           if (res.ok) {
-            setFormData({
+            setFormData(prev => ({
+              ...prev,
               fullName: data.fullName || "",
               username: data.username || "",
               phoneNumber: data.phoneNumber || "",
               address: data.address || "",
-            });
+            }));
           }
         } catch (error) {
           console.error(error);
@@ -59,25 +63,57 @@ export default function ProfilePage() {
     e.preventDefault();
     setSaving(true);
 
+    // 1. Validasi Password
+    if (formData.password) {
+        if (!formData.oldPassword) {
+            alert("Harap masukkan Password Lama untuk mengganti password!");
+            setSaving(false);
+            return;
+        }
+        if (formData.password !== formData.confirmPassword) {
+            alert("Password baru dan Konfirmasi tidak cocok!");
+            setSaving(false);
+            return;
+        }
+        if (formData.password.length < 6) {
+            alert("Password baru minimal 6 karakter!");
+            setSaving(false);
+            return;
+        }
+    }
+
     try {
+      const payload: any = {
+        fullName: formData.fullName,
+        username: formData.username,
+        phoneNumber: formData.phoneNumber,
+        address: formData.address,
+      };
+
+      // Kirim password lama dan baru hanya jika user ingin mengganti
+      if (formData.password) {
+        payload.password = formData.password;
+        payload.oldPassword = formData.oldPassword; // Kirim ke API
+      }
+
       const res = await fetch("/api/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fullName: formData.fullName,
-          phoneNumber: formData.phoneNumber,
-          address: formData.address,
-        }),
+        body: JSON.stringify(payload),
       });
+
+      const responseData = await res.json();
 
       if (res.ok) {
         alert("Profil berhasil diperbarui! ✅");
-        router.refresh(); // Refresh agar session di navbar ikut update (jika nama berubah)
+        // Reset field password
+        setFormData(prev => ({ ...prev, password: "", confirmPassword: "", oldPassword: "" }));
+        router.refresh(); 
       } else {
-        alert("Gagal update profil.");
+        alert(responseData.message || "Gagal update profil.");
       }
     } catch (error) {
-      alert("Terjadi kesalahan.");
+      alert("Terjadi kesalahan sistem.");
     } finally {
       setSaving(false);
     }
@@ -89,7 +125,6 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-20">
-      {/* Navbar Simpel */}
       <nav className="sticky top-0 z-50 w-full bg-white/95 backdrop-blur-md border-b px-4 py-4 shadow-sm">
         <div className="container mx-auto flex items-center gap-4">
           <Link href="/" className="flex items-center gap-2 text-slate-600 hover:text-primary transition-colors">
@@ -108,60 +143,123 @@ export default function ProfilePage() {
                 <User className="h-8 w-8 text-primary" />
               </div>
               <div>
-                <CardTitle className="text-2xl font-bold text-slate-800">{formData.fullName}</CardTitle>
-                <CardDescription>@{formData.username}</CardDescription>
+                <CardTitle className="text-2xl font-bold text-slate-800">{formData.fullName || "User"}</CardTitle>
+                <CardDescription>Edit informasi pribadi dan keamanan akun Anda.</CardDescription>
               </div>
             </div>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
               
-              <div className="space-y-2">
-                <Label htmlFor="fullname">Nama Lengkap</Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
-                  <Input 
-                    id="fullname" 
-                    value={formData.fullName} 
-                    onChange={(e) => setFormData({...formData, fullName: e.target.value})}
-                    className="pl-9"
-                    placeholder="Nama Lengkap Anda"
-                  />
-                </div>
+              {/* BAGIAN 1: INFORMASI UMUM */}
+              <div className="space-y-4">
+                  <h3 className="font-semibold text-slate-900 flex items-center gap-2 border-b pb-2">
+                    <User className="h-4 w-4" /> Informasi Pribadi
+                  </h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="fullname">Nama Lengkap</Label>
+                        <Input 
+                        id="fullname" 
+                        value={formData.fullName} 
+                        onChange={(e) => setFormData({...formData, fullName: e.target.value})}
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="username">Username</Label>
+                        <Input 
+                        id="username" 
+                        value={formData.username} 
+                        onChange={(e) => setFormData({...formData, username: e.target.value})}
+                        />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Nomor WhatsApp</Label>
+                    <Input 
+                      id="phone" 
+                      type="tel"
+                      value={formData.phoneNumber} 
+                      onChange={(e) => setFormData({...formData, phoneNumber: e.target.value})}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="address">Alamat Pengiriman</Label>
+                    <Textarea 
+                      id="address" 
+                      value={formData.address} 
+                      onChange={(e) => setFormData({...formData, address: e.target.value})}
+                      className="min-h-[80px]"
+                    />
+                  </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="phone">Nomor WhatsApp</Label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
-                  <Input 
-                    id="phone" 
-                    type="tel"
-                    value={formData.phoneNumber} 
-                    onChange={(e) => setFormData({...formData, phoneNumber: e.target.value})}
-                    className="pl-9"
-                    placeholder="08xxxxxxxxxx"
-                  />
-                </div>
-                <p className="text-[11px] text-slate-500">Penting untuk konfirmasi pesanan.</p>
+              {/* BAGIAN 2: KEAMANAN (PASSWORD) */}
+              <div className="space-y-4 pt-4">
+                  <h3 className="font-semibold text-slate-900 flex items-center gap-2 border-b pb-2">
+                    <Lock className="h-4 w-4" /> Ganti Password
+                  </h3>
+                  
+                  <div className="bg-slate-50 p-4 rounded-lg border border-slate-100 space-y-4">
+                      <p className="text-xs text-slate-500 mb-2 flex items-center gap-1">
+                        <ShieldAlert className="h-3 w-3" /> Kosongkan jika tidak ingin mengganti password.
+                      </p>
+
+                      {/* --- INPUT PASSWORD LAMA --- */}
+                      <div className="space-y-2">
+                        <Label htmlFor="oldPassword">Password Lama</Label>
+                        <div className="relative">
+                            <Lock className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                            <Input 
+                                id="oldPassword" 
+                                type="password"
+                                value={formData.oldPassword} 
+                                onChange={(e) => setFormData({...formData, oldPassword: e.target.value})}
+                                className="pl-9 bg-white"
+                                placeholder="Wajib diisi jika ganti password"
+                            />
+                        </div>
+                      </div>
+
+                      {/* --- INPUT PASSWORD BARU --- */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="password">Password Baru</Label>
+                          <div className="relative">
+                              <KeyRound className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                              <Input 
+                                  id="password" 
+                                  type="password"
+                                  value={formData.password} 
+                                  onChange={(e) => setFormData({...formData, password: e.target.value})}
+                                  className="pl-9 bg-white"
+                                  placeholder="Password baru"
+                              />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="confirmPassword">Konfirmasi</Label>
+                          <div className="relative">
+                              <KeyRound className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                              <Input 
+                                  id="confirmPassword" 
+                                  type="password"
+                                  value={formData.confirmPassword} 
+                                  onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
+                                  className="pl-9 bg-white"
+                                  placeholder="Ulangi password baru"
+                              />
+                          </div>
+                        </div>
+                      </div>
+                  </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="address">Alamat Pengiriman</Label>
-                <div className="relative">
-                  <MapPin className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
-                  <Textarea 
-                    id="address" 
-                    value={formData.address} 
-                    onChange={(e) => setFormData({...formData, address: e.target.value})}
-                    className="pl-9 min-h-[100px]"
-                    placeholder="Contoh: Jl. Mawar No. 10, RT 01/02, Jakarta Selatan (Pagar Hitam)"
-                  />
-                </div>
-                <p className="text-[11px] text-slate-500">Pastikan alamat lengkap agar kurir tidak nyasar.</p>
-              </div>
-
-              <Button type="submit" disabled={saving} className="w-full bg-primary hover:bg-primary/90 h-12 text-lg font-bold">
+              <Button type="submit" disabled={saving} className="w-full bg-primary hover:bg-primary/90 h-12 text-lg font-bold shadow-md mt-6">
                 {saving ? (
                   <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Menyimpan...</>
                 ) : (
