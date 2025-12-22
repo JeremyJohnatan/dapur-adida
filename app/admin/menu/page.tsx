@@ -7,11 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Loader2, Plus, Pencil, Trash2, ChefHat, Search, ImageIcon } from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2, ChefHat, Search, ImageIcon, Star } from "lucide-react"; // Import Star
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch"; // Pastikan kamu punya component Switch ui shadcn
 
 // --- KONFIGURASI CLOUDINARY ---
-// 1. Cloud Name: Cek di Dashboard Cloudinary (biasanya nama pendek tanpa spasi)
 const CLOUDINARY_CLOUD_NAME = "dvntlphzd"; 
 const CLOUDINARY_UPLOAD_PRESET = "dapur-adida-preset"; 
 
@@ -23,6 +23,7 @@ interface Menu {
   price: string;
   imageUrl: string;
   isAvailable: boolean;
+  isFeatured: boolean; // <--- Tambahan Field
 }
 
 export default function AdminMenuPage() {
@@ -43,7 +44,8 @@ export default function AdminMenuPage() {
     description: "",
     price: "",
     imageUrl: "",
-    isAvailable: true
+    isAvailable: true,
+    isFeatured: false // <--- Tambahan State
   });
 
   // State File Upload
@@ -53,7 +55,7 @@ export default function AdminMenuPage() {
   // --- FETCH DATA ---
   const fetchMenus = async () => {
     try {
-      const res = await fetch("/api/menus");
+      const res = await fetch("/api/admin/menu"); // Pastikan endpoint GET menampilkan semua data
       if (res.ok) setMenus(await res.json());
     } catch (error) {
       console.error(error);
@@ -66,7 +68,7 @@ export default function AdminMenuPage() {
     fetchMenus();
   }, []);
 
-  // --- HANDLER UPLOAD GAMBAR KE CLOUDINARY ---
+  // --- HANDLER UPLOAD GAMBAR ---
   const handleImageUpload = async (file: File): Promise<string | null> => {
     setIsUploading(true);
     const formData = new FormData();
@@ -74,7 +76,6 @@ export default function AdminMenuPage() {
     formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET); 
 
     try {
-      // Pastikan URL ini benar sesuai cloud name kamu
       const res = await fetch(
         `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
         { method: "POST", body: formData }
@@ -88,12 +89,11 @@ export default function AdminMenuPage() {
     } catch (error) {
       console.error("Gagal upload gambar:", error);
       setIsUploading(false);
-      alert(`Gagal upload gambar. Pastikan Cloud Name '${CLOUDINARY_CLOUD_NAME}' sudah benar.`);
+      alert(`Gagal upload gambar. Cek Cloud Name.`);
       return null;
     }
   };
 
-  // --- HANDLER FILE INPUT ---
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
@@ -102,9 +102,9 @@ export default function AdminMenuPage() {
     }
   };
 
-  // --- HANDLERS FORM ---
+  // --- CRUD HANDLERS ---
   const resetForm = () => {
-    setFormData({ id: "", name: "", description: "", price: "", imageUrl: "", isAvailable: true });
+    setFormData({ id: "", name: "", description: "", price: "", imageUrl: "", isAvailable: true, isFeatured: false });
     setSelectedFile(null);
     setPreviewUrl(null);
     setIsEditing(false);
@@ -117,12 +117,32 @@ export default function AdminMenuPage() {
       description: menu.description || "",
       price: menu.price.toString(),
       imageUrl: menu.imageUrl || "",
-      isAvailable: menu.isAvailable
+      isAvailable: menu.isAvailable,
+      isFeatured: menu.isFeatured // Load status featured
     });
     setPreviewUrl(menu.imageUrl); 
     setSelectedFile(null); 
     setIsEditing(true);
     setIsModalOpen(true);
+  };
+
+  // --- FITUR CEPAT: TOGGLE REKOMENDASI (KLIK BINTANG) ---
+  const toggleFeatured = async (menu: Menu) => {
+    // Optimistic Update (Ubah tampilan dulu biar cepet)
+    const newStatus = !menu.isFeatured;
+    setMenus(prev => prev.map(m => m.id === menu.id ? { ...m, isFeatured: newStatus } : m));
+
+    try {
+      await fetch(`/api/admin/menu/${menu.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isFeatured: newStatus }),
+      });
+    } catch (error) {
+      // Revert jika gagal
+      setMenus(prev => prev.map(m => m.id === menu.id ? { ...m, isFeatured: !newStatus } : m));
+      alert("Gagal update status rekomendasi");
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -145,7 +165,6 @@ export default function AdminMenuPage() {
     try {
       let finalImageUrl = formData.imageUrl;
 
-      // 1. Upload Gambar jika ada file baru
       if (selectedFile) {
         const uploadedUrl = await handleImageUpload(selectedFile);
         if (!uploadedUrl) {
@@ -155,21 +174,24 @@ export default function AdminMenuPage() {
         finalImageUrl = uploadedUrl;
       }
 
-      // 2. Simpan ke Database
       const url = isEditing ? `/api/admin/menu/${formData.id}` : "/api/admin/menu";
       const method = isEditing ? "PATCH" : "POST";
 
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...formData, imageUrl: finalImageUrl }),
+        body: JSON.stringify({ 
+            ...formData, 
+            price: Number(formData.price), // Konversi angka
+            imageUrl: finalImageUrl 
+        }),
       });
 
       if (!res.ok) throw new Error("Gagal menyimpan");
 
       alert(isEditing ? "Menu diperbarui!" : "Menu ditambahkan!");
       setIsModalOpen(false);
-      fetchMenus();
+      fetchMenus(); // Refresh data
       resetForm();
     } catch (error) {
       console.error(error);
@@ -187,7 +209,10 @@ export default function AdminMenuPage() {
   return (
     <div className="space-y-6 p-8">
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-        <h1 className="text-2xl font-bold text-slate-800">Manajemen Menu</h1>
+        <div>
+            <h1 className="text-2xl font-bold text-slate-800">Manajemen Menu</h1>
+            <p className="text-slate-500 text-sm">Klik ikon <Star className="inline h-3 w-3 text-orange-400 fill-orange-400"/> untuk mengatur Rekomendasi Spesial.</p>
+        </div>
         
         <div className="flex gap-2 w-full sm:w-auto">
           <div className="relative flex-1 sm:w-64">
@@ -211,13 +236,15 @@ export default function AdminMenuPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredMenus.map((menu) => (
-            <Card key={menu.id} className="overflow-hidden group hover:shadow-lg transition-all border-slate-200">
+            <Card key={menu.id} className={`overflow-hidden group hover:shadow-lg transition-all border-slate-200 ${menu.isFeatured ? 'ring-2 ring-orange-400' : ''}`}>
               <div className="relative h-48 bg-slate-100">
                 {menu.imageUrl ? (
                   <Image src={menu.imageUrl} alt={menu.name} fill className="object-cover" />
                 ) : (
                   <div className="flex items-center justify-center h-full text-slate-300"><ChefHat className="h-12 w-12" /></div>
                 )}
+                
+                {/* BUTTON ACTIONS */}
                 <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <Button size="icon" variant="secondary" className="h-8 w-8 bg-white/90 hover:bg-white" onClick={() => handleEdit(menu)}>
                     <Pencil className="h-4 w-4 text-blue-600" />
@@ -226,9 +253,19 @@ export default function AdminMenuPage() {
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
+
+                {/* BUTTON TOGGLE REKOMENDASI (STAR) */}
+                <button 
+                    onClick={() => toggleFeatured(menu)}
+                    className="absolute top-2 left-2 p-1.5 rounded-full bg-white/90 hover:bg-white shadow-sm transition-all z-10"
+                    title={menu.isFeatured ? "Hapus dari Rekomendasi" : "Jadikan Rekomendasi"}
+                >
+                    <Star className={`h-5 w-5 ${menu.isFeatured ? "text-orange-500 fill-orange-500" : "text-slate-300"}`} />
+                </button>
+
                 {!menu.isAvailable && (
-                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                    <Badge variant="destructive">Tidak Tersedia</Badge>
+                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center pointer-events-none">
+                    <Badge variant="destructive">Habis</Badge>
                   </div>
                 )}
               </div>
@@ -238,6 +275,12 @@ export default function AdminMenuPage() {
                   <span className="font-bold text-primary text-sm">{formatRupiah(menu.price)}</span>
                 </div>
                 <p className="text-slate-500 text-xs line-clamp-2 h-8">{menu.description}</p>
+                
+                {menu.isFeatured && (
+                    <div className="mt-3 flex items-center gap-1 text-[10px] font-bold text-orange-600 bg-orange-50 w-fit px-2 py-1 rounded-full">
+                        <Star className="h-3 w-3 fill-current"/> Rekomendasi Spesial
+                    </div>
+                )}
               </CardContent>
             </Card>
           ))}
@@ -284,6 +327,22 @@ export default function AdminMenuPage() {
               />
             </div>
 
+            {/* TOGGLE REKOMENDASI DI FORM */}
+            <div className="flex items-center justify-between border p-3 rounded-md bg-slate-50">
+                <div className="flex items-center gap-2">
+                    <Star className={`h-5 w-5 ${formData.isFeatured ? "text-orange-500 fill-orange-500" : "text-slate-400"}`} />
+                    <Label htmlFor="featured" className="cursor-pointer">Rekomendasi Spesial?</Label>
+                </div>
+                {/* Checkbox Manual jika tidak pakai komponen Switch */}
+                <input 
+                    type="checkbox" 
+                    id="featured"
+                    className="h-5 w-5 accent-orange-500"
+                    checked={formData.isFeatured}
+                    onChange={(e) => setFormData({...formData, isFeatured: e.target.checked})}
+                />
+            </div>
+
             {/* INPUT UPLOAD GAMBAR */}
             <div className="space-y-3">
               <Label>Foto Menu</Label>
@@ -307,7 +366,7 @@ export default function AdminMenuPage() {
                     className="cursor-pointer text-xs file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
                   />
                   <p className="text-[10px] text-slate-400 mt-1">
-                    Atau gunakan URL eksternal di bawah ini jika tidak ingin upload.
+                    Atau gunakan URL eksternal di bawah ini.
                   </p>
                 </div>
               </div>

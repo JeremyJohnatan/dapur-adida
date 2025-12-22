@@ -54,6 +54,7 @@ model Menu {
   price       Decimal   @db.Decimal(10, 2)
   imageUrl    String?
   isAvailable Boolean   @default(true)
+  isFeatured  Boolean   @default(false)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   orderItems  OrderItem[]

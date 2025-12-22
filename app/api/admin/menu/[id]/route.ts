@@ -32,6 +32,7 @@ export async function PATCH(
         price: body.price ? Number(body.price) : undefined, // Pastikan harga jadi angka
         imageUrl: body.imageUrl,
         isAvailable: body.isAvailable,
+        isFeatured: body.isFeatured,
       },
     });
 

@@ -3,43 +3,43 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 
-
-// PATCH: Edit Menu
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions);
-  if (!session || session?.user?.role !== "ADMIN") return NextResponse.json({ message: "Forbidden" }, { status: 403 });
-
+// GET: Ambil Semua Menu
+export async function GET() {
   try {
-    const body = await request.json();
-    const updatedMenu = await prisma.menu.update({
-      where: { id: params.id },
-      data: {
-        name: body.name,
-        description: body.description,
-        price: body.price ? Number(body.price) : undefined,
-        imageUrl: body.imageUrl,
-        isAvailable: body.isAvailable,
-      },
+    const menus = await prisma.menu.findMany({
+      orderBy: { createdAt: 'desc' },
     });
-
-    return NextResponse.json(updatedMenu);
+    return NextResponse.json(menus);
   } catch (error) {
-    return NextResponse.json({ message: "Gagal update menu" }, { status: 500 });
+    return NextResponse.json({ message: "Gagal mengambil data menu" }, { status: 500 });
   }
 }
 
-// DELETE: Hapus Menu
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+// POST: Tambah Menu Baru (Solusi Error 405)
+export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
-  if (!session || session?.user?.role !== "ADMIN") return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+  
+  // Validasi Admin
+  if (!session || session?.user?.role !== "ADMIN") {
+    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+  }
 
   try {
-    await prisma.menu.delete({
-      where: { id: params.id },
+    const body = await request.json();
+
+    const newMenu = await prisma.menu.create({
+      data: {
+        name: body.name,
+        description: body.description,
+        price: Number(body.price), // Konversi ke Number agar tidak error
+        imageUrl: body.imageUrl,
+        isAvailable: body.isAvailable ?? true,
+      },
     });
 
-    return NextResponse.json({ message: "Menu dihapus" });
+    return NextResponse.json(newMenu, { status: 201 });
   } catch (error) {
-    return NextResponse.json({ message: "Gagal hapus menu" }, { status: 500 });
+    console.error("Error create menu:", error);
+    return NextResponse.json({ message: "Gagal menambah menu" }, { status: 500 });
   }
 }
