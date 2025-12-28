@@ -3,11 +3,14 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+// 1. Import Image dari next/image
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChefHat, Loader2, Eye, EyeOff } from 'lucide-react'; // Import Icon Mata
+// 2. Hapus ChefHat dari import lucide-react
+import { Loader2, Eye, EyeOff } from 'lucide-react';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -27,21 +30,20 @@ export default function RegisterPage() {
     const fullName = formData.get("fullname");
     const username = formData.get("username");
     const password = formData.get("password") as string;
-    const confirmPassword = formData.get("confirmPassword") as string; // Ambil konfirmasi
+    const confirmPassword = formData.get("confirmPassword") as string;
     const phone = formData.get("phone");
 
     // 1. VALIDASI MANUAL: Cek apakah password sama
     if (password !== confirmPassword) {
       setError("Kata sandi tidak cocok! Silakan periksa kembali.");
       setIsLoading(false);
-      return; // Stop proses jika tidak sama
+      return;
     }
 
     try {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // Kirim data ke backend (confirmPassword tidak perlu dikirim ke DB)
         body: JSON.stringify({ fullName, username, password, phone }),
       });
 
@@ -66,8 +68,16 @@ export default function RegisterPage() {
     <div className="flex items-center justify-center min-h-screen bg-slate-50 p-4">
       <Card className="w-full max-w-md shadow-xl border-t-4 border-slate-900">
         <CardHeader className="space-y-1 text-center">
-          <div className='flex justify-center mb-2'>
-            <ChefHat className="h-10 w-10 text-slate-900" />
+          <div className='flex justify-center mb-4'> {/* Margin bottom disesuaikan */}
+            {/* 3. Ganti ChefHat dengan Image Logo */}
+            <Image
+              src="/logo_dapuradida.jpeg"
+              alt="Logo Dapur Adida"
+              width={80}
+              height={80}
+              className="object-contain"
+              priority
+            />
           </div>
           <CardTitle className="text-2xl font-bold text-slate-800">Daftar Akun</CardTitle>
           <CardDescription>
@@ -107,7 +117,7 @@ export default function RegisterPage() {
                 <Input 
                   id="password" 
                   name="password" 
-                  type={showPassword ? "text" : "password"} // Toggle Tipe
+                  type={showPassword ? "text" : "password"} 
                   required 
                   disabled={isLoading} 
                   placeholder="Minimal 6 karakter"
@@ -124,14 +134,14 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            {/* INPUT KONFIRMASI PASSWORD (BARU) */}
+            {/* INPUT KONFIRMASI PASSWORD */}
             <div className="grid gap-2">
               <Label htmlFor="confirmPassword">Konfirmasi Kata Sandi</Label>
               <div className="relative">
                 <Input 
                   id="confirmPassword" 
                   name="confirmPassword" 
-                  type={showConfirmPassword ? "text" : "password"} // Toggle Tipe Confirm
+                  type={showConfirmPassword ? "text" : "password"} 
                   required 
                   disabled={isLoading} 
                   placeholder="Ulangi kata sandi"

@@ -1,20 +1,23 @@
 "use client";
 
 import { useState } from 'react';
-import { signIn, getSession } from 'next-auth/react'; 
+import { signIn, getSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+// 1. Import komponen Image dari next/image
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChefHat, Loader2, Eye, EyeOff } from 'lucide-react'; // Tambahkan Eye dan EyeOff
+// 2. Hapus ChefHat dari import lucide-react
+import { Loader2, Eye, EyeOff } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  
+
   // State untuk toggle password
   const [showPassword, setShowPassword] = useState(false);
 
@@ -40,13 +43,13 @@ export default function LoginPage() {
     } else {
       // 2. Login Sukses! Cek Role
       const session = await getSession();
-      
+
       if (session?.user?.role === "ADMIN") {
         router.push("/admin");
       } else {
         router.push("/");
       }
-      
+
       router.refresh();
     }
   }
@@ -55,8 +58,17 @@ export default function LoginPage() {
     <div className="flex items-center justify-center min-h-screen bg-slate-50 p-4">
       <Card className="w-full max-w-md shadow-xl border-t-4 border-slate-900">
         <CardHeader className="space-y-1 text-center">
-          <div className='flex justify-center mb-2'>
-            <ChefHat className="h-10 w-10 text-slate-900" />
+          <div className='flex justify-center mb-4'> {/* Sedikit menambah margin bottom (mb-4) agar lebih lega */}
+            {/* 3. Mengganti ChefHat dengan Image */}
+            <Image
+              src="/logo_dapuradida.jpeg" // Path ke file di dalam folder public
+              alt="Logo Dapur Adida"
+              width={80}  // Atur lebar gambar (dalam pixel)
+              height={80} // Atur tinggi gambar (dalam pixel)
+              className="object-contain" // Menjaga agar rasio gambar tidak gepeng
+              priority // Opsional: Memberi prioritas loading karena ini gambar di atas lipatan (above the fold)
+            />
+            {/* Sebelumnya: <ChefHat className="h-10 w-10 text-slate-900" /> */}
           </div>
           <CardTitle className="text-2xl font-bold text-slate-800">Masuk ke Dapur Adida</CardTitle>
           <CardDescription>
@@ -74,12 +86,12 @@ export default function LoginPage() {
 
             <div className="grid gap-2">
               <Label htmlFor="username">Username</Label>
-              <Input 
-                id="username" 
-                name="username" 
-                type="text" 
-                placeholder="Username Anda" 
-                required 
+              <Input
+                id="username"
+                name="username"
+                type="text"
+                placeholder="Username Anda"
+                required
                 disabled={isLoading}
               />
             </div>
@@ -88,20 +100,20 @@ export default function LoginPage() {
               <div className="flex items-center">
                 <Label htmlFor="password">Kata Sandi</Label>
               </div>
-              
+
               {/* WRAPPER RELATIVE UNTUK INPUT PASSWORD */}
               <div className="relative">
-                <Input 
-                  id="password" 
-                  name="password" 
+                <Input
+                  id="password"
+                  name="password"
                   // Ubah tipe berdasarkan state showPassword
-                  type={showPassword ? "text" : "password"} 
-                  placeholder="Kata Sandi Anda" 
-                  required 
-                  disabled={isLoading} 
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Kata Sandi Anda"
+                  required
+                  disabled={isLoading}
                   className="pr-10" // Padding kanan agar teks tidak tertutup icon
                 />
-                
+
                 {/* TOMBOL TOGGLE PASSWORD */}
                 <button
                   type="button" // Wajib type="button" agar tidak submit form
