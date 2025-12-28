@@ -24,7 +24,10 @@ interface Menu {
 export default function MenuPage() {
   const [menus, setMenus] = useState<Menu[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // State untuk menyimpan data review per menu
   const [reviews, setReviews] = useState<Record<string, any[]>>({});
+  // State untuk toggle tampil/sembunyi review per menu
   const [showReviews, setShowReviews] = useState<Record<string, boolean>>({});
   
   const { addToCart, totalItems } = useCart(); 
@@ -41,11 +44,17 @@ export default function MenuPage() {
       try {
         const res = await fetch("/api/menus");
         const data = await res.json();
+        
+        // Fetch rating rata-rata untuk setiap menu
         const menusWithRating = await Promise.all(
           data.map(async (menu: Menu) => {
-            const reviewRes = await fetch(`/api/reviews/${menu.id}`);
-            const reviewData = await reviewRes.json();
-            return { ...menu, averageRating: reviewData.averageRating };
+            try {
+              const reviewRes = await fetch(`/api/reviews/${menu.id}`);
+              const reviewData = await reviewRes.json();
+              return { ...menu, averageRating: reviewData.averageRating };
+            } catch (err) {
+              return { ...menu, averageRating: 0 };
+            }
           })
         );
         setMenus(menusWithRating);
@@ -89,11 +98,17 @@ export default function MenuPage() {
 
   // Fungsi untuk toggle reviews
   const toggleReviews = async (menuId: string) => {
+    // Jika data review belum ada di state, fetch dulu
     if (!reviews[menuId]) {
-      const res = await fetch(`/api/reviews/${menuId}`);
-      const data = await res.json();
-      setReviews((prev) => ({ ...prev, [menuId]: data.reviews }));
+      try {
+        const res = await fetch(`/api/reviews/${menuId}`);
+        const data = await res.json();
+        setReviews((prev) => ({ ...prev, [menuId]: data.reviews }));
+      } catch (error) {
+        console.error("Gagal ambil review", error);
+      }
     }
+    // Toggle state tampil/sembunyi
     setShowReviews((prev) => ({ ...prev, [menuId]: !prev[menuId] }));
   };
 
@@ -157,6 +172,7 @@ export default function MenuPage() {
                 className="overflow-hidden border-none shadow-md hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 group bg-white rounded-3xl animate-in fade-in slide-in-from-bottom-4"
                 style={{ animationDelay: `${index * 50}ms`, animationFillMode: 'backwards' }}
               >
+                {/* Bagian Gambar */}
                 <div className="relative h-56 w-full bg-slate-100 overflow-hidden">
                   {menu.imageUrl ? (
                     <Image 
@@ -180,6 +196,7 @@ export default function MenuPage() {
                 </div>
 
                 <CardContent className="p-6">
+                  {/* Judul & Rating Header */}
                   <div className="flex justify-between items-start mb-3 gap-2">
                     <h3 className="font-bold text-lg text-slate-900 line-clamp-1 group-hover:text-primary transition-colors">{menu.name}</h3>
                     {menu.stock <= 0 ? (
@@ -191,6 +208,7 @@ export default function MenuPage() {
                     )}
                   </div>
                   
+                  {/* Deskripsi */}
                   <p className="text-slate-500 text-sm mb-6 line-clamp-2 h-10 leading-relaxed">
                     {menu.description || "Menu spesial dengan cita rasa otentik khas Dapur Adida."}
                   </p>
@@ -198,6 +216,7 @@ export default function MenuPage() {
                     {menu.stock > 0 ? `Tersedia: ${menu.stock}` : <span className="text-red-600 font-bold">Stok Habis</span>}
                   </div>
                   
+                  {/* Bagian Review Trigger */}
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center">
                       {[...Array(5)].map((_, i) => (
@@ -209,34 +228,42 @@ export default function MenuPage() {
                       <span className="ml-1 text-sm text-gray-600">({menu.averageRating?.toFixed(1) || 0})</span>
                     </div>
                     <Button variant="outline" size="sm" onClick={() => toggleReviews(menu.id)}>
-                      Lihat Reviews
+                      {showReviews[menu.id] ? "Tutup Review" : "Lihat Review"}
                     </Button>
                   </div>
+
+                  {/* --- BAGIAN LIST REVIEW (YANG DIPERBAIKI) --- */}
                   {showReviews[menu.id] && (
-                    <div className="mt-2">
-                      {reviews[menuId]?.map((review) => (
-                        <div key={review.id} className="border-t pt-2">
-                          <div className="flex items-center">
-                            {[...Array(5)].map((_, i) => (
-                              <Star
-                                key={i}
-                                className={`w-3 h-3 ${i < review.rating ? 'text-yellow-400 fill-current' : 'text-gray-300'}`}
-                              />
-                            ))}
-                            <span className="ml-1 text-xs text-gray-600">{review.user.fullName}</span>
+                    <div className="mt-3 bg-slate-50 p-3 rounded-lg border border-slate-100 max-h-40 overflow-y-auto">
+                      {reviews[menu.id] && reviews[menu.id].length > 0 ? (
+                        reviews[menu.id].map((review) => (
+                          <div key={review.id} className="border-b last:border-0 border-slate-200 pb-2 mb-2 last:mb-0 last:pb-0">
+                            <div className="flex items-center mb-1">
+                              {[...Array(5)].map((_, i) => (
+                                <Star
+                                  key={i}
+                                  className={`w-3 h-3 ${i < review.rating ? 'text-yellow-400 fill-current' : 'text-gray-300'}`}
+                                />
+                              ))}
+                              <span className="ml-2 text-xs font-semibold text-slate-700">
+                                {review.user?.fullName || "User"}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-600 italic">"{review.comment}"</p>
                           </div>
-                          <p className="text-sm">{review.comment}</p>
-                        </div>
-                      )) || <p className="text-sm text-gray-500">Belum ada review.</p>}
+                        ))
+                      ) : (
+                        <p className="text-xs text-center text-slate-400 py-2">Belum ada review untuk menu ini.</p>
+                      )}
                     </div>
                   )}
                   
-                  <div className="flex justify-between items-center pt-4 border-t border-slate-100">
+                  {/* Harga & Button Beli */}
+                  <div className="flex justify-between items-center pt-4 border-t border-slate-100 mt-2">
                     <span className="font-black text-xl text-primary">
                       {formatRupiah(menu.price)}
                     </span>
                     
-                    {/* Tombol Tambah dengan Efek Ganti Teks */}
                     <Button 
                       size="sm" 
                       disabled={!menu.isAvailable || menu.stock <= 0}
@@ -252,14 +279,14 @@ export default function MenuPage() {
                       {menu.stock <= 0 ? (
                         "Sold Out"
                       ) : addedItems[menu.id] ? (
-                         <>
-                           <Check className="h-4 w-4 mr-1 animate-in zoom-in spin-in-90 duration-300" /> Masuk
-                         </>
-                      ) : (
-                         <>
-                           <Plus className="h-4 w-4 mr-1" /> Tambah
-                         </>
-                      )}
+                          <>
+                            <Check className="h-4 w-4 mr-1 animate-in zoom-in spin-in-90 duration-300" /> Masuk
+                          </>
+                       ) : (
+                          <>
+                            <Plus className="h-4 w-4 mr-1" /> Tambah
+                          </>
+                       )}
                     </Button>
                   </div>
                 </CardContent>
