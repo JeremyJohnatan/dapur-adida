@@ -7,9 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Loader2, Plus, Pencil, Trash2, ChefHat, Search, ImageIcon, Star } from "lucide-react"; // Import Star
+import { Loader2, Plus, Pencil, Trash2, ChefHat, Search, ImageIcon, Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch"; // Pastikan kamu punya component Switch ui shadcn
 import { pusherClient } from "@/lib/pusher";
 
 // --- KONFIGURASI CLOUDINARY ---
@@ -23,7 +22,7 @@ interface Menu {
   price: string;
   imageUrl: string;
   isAvailable: boolean;
-  isFeatured: boolean; // <--- Tambahan Field
+  isFeatured: boolean;
   stock: number;
 }
 
@@ -45,8 +44,8 @@ export default function AdminMenuPage() {
     description: "",
     price: "",
     imageUrl: "",
-    isAvailable: true,
-    isFeatured: false, // <--- Tambahan State
+    isAvailable: true, // Default true, input UI dihapus
+    isFeatured: false,
     stock: 0
   });
 
@@ -56,7 +55,7 @@ export default function AdminMenuPage() {
 
   const fetchMenus = async () => {
     try {
-      const res = await fetch("/api/admin/menu"); // Pastikan endpoint GET menampilkan semua data
+      const res = await fetch("/api/admin/menu");
       if (res.ok) setMenus(await res.json());
     } catch (error) {
       console.error(error);
@@ -134,7 +133,7 @@ export default function AdminMenuPage() {
       price: menu.price.toString(),
       imageUrl: menu.imageUrl || "",
       isAvailable: menu.isAvailable,
-      isFeatured: menu.isFeatured, // Load status featured
+      isFeatured: menu.isFeatured,
       stock: menu.stock
     });
     setPreviewUrl(menu.imageUrl); 
@@ -145,7 +144,7 @@ export default function AdminMenuPage() {
 
   // --- FITUR CEPAT: TOGGLE REKOMENDASI (KLIK BINTANG) ---
   const toggleFeatured = async (menu: Menu) => {
-    // Optimistic Update (Ubah tampilan dulu biar cepet)
+    // Optimistic Update
     const newStatus = !menu.isFeatured;
     setMenus(prev => prev.map(m => m.id === menu.id ? { ...m, isFeatured: newStatus } : m));
 
@@ -156,7 +155,6 @@ export default function AdminMenuPage() {
         body: JSON.stringify({ isFeatured: newStatus }),
       });
     } catch (error) {
-      // Revert jika gagal
       setMenus(prev => prev.map(m => m.id === menu.id ? { ...m, isFeatured: !newStatus } : m));
       alert("Gagal update status rekomendasi");
     }
@@ -199,7 +197,7 @@ export default function AdminMenuPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
             ...formData, 
-            price: Number(formData.price), // Konversi angka
+            price: Number(formData.price),
             imageUrl: finalImageUrl 
         }),
       });
@@ -208,7 +206,7 @@ export default function AdminMenuPage() {
 
       alert(isEditing ? "Menu diperbarui!" : "Menu ditambahkan!");
       setIsModalOpen(false);
-      fetchMenus(); // Refresh data
+      fetchMenus();
       resetForm();
     } catch (error) {
       console.error(error);
@@ -234,6 +232,7 @@ export default function AdminMenuPage() {
       // Alphabetical by name
       return a.name.localeCompare(b.name);
     });
+
   const formatRupiah = (price: string) => {
     return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(Number(price));
   };
@@ -331,7 +330,8 @@ export default function AdminMenuPage() {
 
       {/* MODAL FORM ADD/EDIT */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        {/* PERBAIKAN: Menambahkan max-h dan overflow-y-auto agar bisa di-scroll */}
+        <DialogContent className="sm:max-w-[500px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{isEditing ? "Edit Menu" : "Tambah Menu Baru"}</DialogTitle>
           </DialogHeader>
@@ -352,17 +352,7 @@ export default function AdminMenuPage() {
               </div>
             </div>
             
-            <div className="space-y-2">
-              <Label htmlFor="status">Ketersediaan</Label>
-              <select 
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
-                value={formData.isAvailable ? "true" : "false"}
-                onChange={(e) => setFormData({...formData, isAvailable: e.target.value === "true"})}
-              >
-                <option value="true">Tersedia</option>
-                <option value="false">Habis</option>
-              </select>
-            </div>
+            {/* BAGIAN KETERSEDIAAN DIHAPUS */}
 
             <div className="space-y-2">
               <Label htmlFor="desc">Deskripsi</Label>
@@ -380,7 +370,6 @@ export default function AdminMenuPage() {
                     <Star className={`h-5 w-5 ${formData.isFeatured ? "text-orange-500 fill-orange-500" : "text-slate-400"}`} />
                     <Label htmlFor="featured" className="cursor-pointer">Rekomendasi Spesial?</Label>
                 </div>
-                {/* Checkbox Manual jika tidak pakai komponen Switch */}
                 <input 
                     type="checkbox" 
                     id="featured"

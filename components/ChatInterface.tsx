@@ -46,6 +46,7 @@ export default function ChatInterface() {
 function AdminChatView({ session }: { session: any }) {
   const searchParams = useSearchParams();
   
+  const [searchQuery, setSearchQuery] = useState(""); 
   const [inboxList, setInboxList] = useState<InboxItem[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [selectedPartnerId, setSelectedPartnerId] = useState<string | null>(null);
@@ -61,6 +62,7 @@ function AdminChatView({ session }: { session: any }) {
     }
   }, [searchParams]);
 
+  // 1. Fetch Inbox Awal
   useEffect(() => {
     const fetchInbox = async () => {
       try {
@@ -71,15 +73,22 @@ function AdminChatView({ session }: { session: any }) {
     fetchInbox();
 
     const channel = pusherClient.subscribe("admin-channel");
+    
     channel.bind("new-inbox", (data: any) => {
       setInboxList((prev) => {
+        // Cek apakah chat yang masuk adalah chat yang sedang dibuka sekarang?
+        // Jika iya, jangan set unread jadi true
+        const isCurrentlyOpen = selectedPartnerId === data.userId;
+
         const filtered = prev.filter(item => item.userId !== data.userId);
+        
         return [{
           userId: data.userId, 
           name: data.name, 
           lastMessage: data.lastMessage, 
-          lastTime: data.lastTime, 
-          unread: true
+          lastTime: new Date().toISOString(),
+          // Kalau chatnya lagi dibuka, jangan kasih titik merah (false), kalau tidak dibuka kasih (true)
+          unread: isCurrentlyOpen ? false : true 
         }, ...filtered];
       });
     });
@@ -88,12 +97,28 @@ function AdminChatView({ session }: { session: any }) {
       channel.unbind_all();
       pusherClient.unsubscribe("admin-channel");
     };
-  }, []);
+  }, [selectedPartnerId]); // Tambahkan selectedPartnerId ke dependency biar realtime tau chat mana yg aktif
 
+  // 2. Logic Buka Room Chat & Mark as Read
   useEffect(() => {
     if (!selectedPartnerId) return;
 
     setLoadingMsg(true);
+    
+    // A. Update Tampilan Lokal (Biar titik merah hilang seketika)
+    setInboxList((prev) => prev.map(item => 
+      item.userId === selectedPartnerId ? { ...item, unread: false } : item
+    ));
+
+    // B. PENTING: Beritahu Server/Database bahwa pesan sudah dibaca!
+    // Kamu PERLU memastikan backend (API) kamu menangani request PATCH/POST ini.
+    fetch(`/api/chat/read`, { 
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: selectedPartnerId })
+    }).catch(err => console.error("Gagal update status read", err));
+
+    // C. Ambil pesan
     const fetchRoom = async () => {
       try {
         const res = await fetch(`/api/chat?userId=${selectedPartnerId}`);
@@ -109,6 +134,7 @@ function AdminChatView({ session }: { session: any }) {
     
     channel.bind("new-message", (newChat: ChatMessage) => {
       setMessages((prev) => {
+        // Cek duplikasi ID (Safety net)
         if (prev.some(msg => msg.id === newChat.id)) return prev;
         return [...prev, newChat];
       });
@@ -129,19 +155,28 @@ function AdminChatView({ session }: { session: any }) {
     if (!newMessage.trim() || !selectedPartnerId) return;
     
     const tempMessage = newMessage;
-    setNewMessage("");
+    setNewMessage(""); // Kosongkan input langsung
 
     try {
+      // PERBAIKAN DOUBLE CHAT:
+      // Saya menghapus bagian "Optimistic Update" (setMessages manual).
+      // Kita biarkan Pusher yang mengurus update UI saat pesan berhasil masuk server.
+      // Ini sedikit lebih lambat (tergantung internet), tapi 100% anti-double.
+
       await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: tempMessage, targetUserId: selectedPartnerId }),
       });
     } catch (error) {
-      setNewMessage(tempMessage);
+      setNewMessage(tempMessage); // Kembalikan teks jika gagal
       alert("Gagal mengirim pesan");
     }
   };
+
+  const filteredInbox = inboxList.filter((item) => 
+    item.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const selectedUser = inboxList.find(i => i.userId === selectedPartnerId);
 
@@ -154,23 +189,35 @@ function AdminChatView({ session }: { session: any }) {
             <h2 className="font-bold text-slate-800 mb-2">Pesan Masuk</h2>
             <div className="relative">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-slate-400" />
-              <input placeholder="Cari nama..." className="w-full pl-8 pr-3 py-2 text-sm border rounded-md bg-white focus:outline-primary" />
+              <input 
+                placeholder="Cari nama..." 
+                className="w-full pl-8 pr-3 py-2 text-sm border rounded-md bg-white focus:outline-primary"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
             </div>
           </div>
           
           <div className="flex-1 overflow-y-auto">
-            {inboxList.length === 0 ? (
-              <div className="text-center p-8 text-slate-400 text-sm">Belum ada pesan masuk.</div>
+            {filteredInbox.length === 0 ? (
+              <div className="text-center p-8 text-slate-400 text-sm">
+                {searchQuery ? "Nama tidak ditemukan" : "Belum ada pesan masuk."}
+              </div>
             ) : (
-              inboxList.map((item) => (
+              filteredInbox.map((item) => (
                 <div 
                   key={item.userId} 
                   onClick={() => setSelectedPartnerId(item.userId)}
-                  className={`p-4 border-b cursor-pointer transition-colors hover:bg-slate-50 
+                  className={`p-4 border-b cursor-pointer transition-colors hover:bg-slate-50 relative
                     ${selectedPartnerId === item.userId ? "bg-primary/5 border-l-4 border-l-primary" : "border-l-4 border-l-transparent"}`}
                 >
-                  <div className="flex justify-between items-start mb-1">
-                    <span className={`font-semibold text-sm truncate ${item.unread ? "text-slate-900" : "text-slate-600"}`}>
+                  {/* Titik Merah hanya muncul jika unread true DAN bukan user yg sedang dibuka */}
+                  {item.unread && selectedPartnerId !== item.userId && (
+                    <span className="absolute top-4 right-4 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white animate-pulse"></span>
+                  )}
+
+                  <div className="flex justify-between items-start mb-1 pr-4">
+                    <span className={`font-semibold text-sm truncate ${item.unread ? "text-slate-900 font-bold" : "text-slate-600"}`}>
                       {item.name}
                     </span>
                     <span className="text-[10px] text-slate-400 whitespace-nowrap ml-2">
@@ -213,8 +260,8 @@ function AdminChatView({ session }: { session: any }) {
                 {loadingMsg ? (
                    <div className="flex justify-center pt-10"><Loader2 className="animate-spin text-primary"/></div>
                 ) : (
-                   messages.map((msg) => (
-                    <div key={msg.id} className={`flex ${msg.senderId === session?.user?.id ? "justify-end" : "justify-start"}`}>
+                   messages.map((msg, index) => (
+                    <div key={msg.id || index} className={`flex ${msg.senderId === session?.user?.id ? "justify-end" : "justify-start"}`}>
                       <div className={`max-w-[75%] px-4 py-3 rounded-2xl text-sm shadow-sm break-all whitespace-pre-wrap
                         ${msg.senderId === session?.user?.id 
                           ? "bg-primary text-white rounded-br-none" 
@@ -249,7 +296,6 @@ function AdminChatView({ session }: { session: any }) {
               </div>
             </>
           ) : (
-            // STATE KOSONG (Belum pilih user)
             <div className="flex-1 flex flex-col items-center justify-center text-slate-300 select-none">
               <MessageSquare className="h-16 w-16 mb-4 opacity-20" />
               <p className="text-lg font-medium text-slate-400">Pilih pesan untuk mulai membalas</p>
