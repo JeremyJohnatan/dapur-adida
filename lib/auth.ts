@@ -16,9 +16,9 @@ export const authOptions: AuthOptions = {
           throw new Error("Username dan Password wajib diisi");
         }
 
-        // 1. Cari user berdasarkan USERNAME
+        // 1. Cari user berdasarkan USERNAME (case insensitive)
         const user = await prisma.user.findUnique({
-          where: { username: credentials.username }
+          where: { username: credentials.username.toLowerCase() }
         });
 
         if (!user) {
@@ -39,7 +39,7 @@ export const authOptions: AuthOptions = {
         return {
           id: user.id,
           name: user.fullName,
-          email: user.username, // Kita pinjam field email untuk simpan username
+          email: user.username,
           role: user.role, 
         };
       }

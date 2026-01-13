@@ -16,43 +16,77 @@ export async function POST(request: Request) {
       );
     }
 
-    // 2. Cek apakah username sudah dipakai orang lain?
+    // 2. Username validation - minimal 3 karakter
+    if (username.length < 3) {
+      return NextResponse.json(
+        { message: "Username minimal 3 karakter" },
+        { status: 400 }
+      );
+    }
+
+    // 3. Username hanya huruf, angka, dan underscore
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+      return NextResponse.json(
+        { message: "Username hanya boleh huruf, angka, dan underscore" },
+        { status: 400 }
+      );
+    }
+
+    // 4. Cek apakah username sudah dipakai - case insensitive
     const existingUser = await prisma.user.findUnique({
-      where: { username: username },
+      where: { username: username.toLowerCase() },
     });
 
     if (existingUser) {
       return NextResponse.json(
         { message: "Username sudah digunakan, silakan pilih yang lain." },
-        { status: 400 }
+        { status: 409 }
       );
     }
 
-    // 3. Enkripsi Password (Hashing)
+    // 5. Enkripsi Password (Hashing)
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // 4. Simpan User Baru ke Database
+    // 6. Simpan User Baru ke Database
     const newUser = await prisma.user.create({
       data: {
         fullName,
-        username, // Simpan username
+        username: username.toLowerCase(),
         password: hashedPassword,
         phoneNumber: phone,
-        role: "CUSTOMER", // Default jadi customer
+        role: "CUSTOMER",
       },
     });
 
-    // 5. Sukses (Buang password dari data yang dikembalikan biar aman)
+    // 7. Sukses (Buang password dari data yang dikembalikan biar aman)
     const { password: newUserPassword, ...rest } = newUser;
 
     return NextResponse.json(
       { user: rest, message: "Pendaftaran berhasil!" },
       { status: 201 }
     );
-  } catch (error) {
-    console.error("Register Error:", error);
+  } catch (error: any) {
+    console.error("Register error:", error);
+
+    // Handle Prisma unique constraint violation
+    if (error.code === "P2002") {
+      return NextResponse.json(
+        { message: "Username sudah terdaftar. Silakan gunakan username lain." },
+        { status: 409 }
+      );
+    }
+
+    // Handle other database errors
+    if (error instanceof Error && error.message.includes("Unique constraint")) {
+      return NextResponse.json(
+        { message: "Username sudah terdaftar. Silakan gunakan username lain." },
+        { status: 409 }
+      );
+    }
+
+    // Generic server error
     return NextResponse.json(
-      { message: "Terjadi kesalahan server saat mendaftar." },
+      { message: "Gagal mendaftar. Coba lagi nanti." },
       { status: 500 }
     );
   }

@@ -1,25 +1,87 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-// 1. Import Image dari next/image
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-// 2. Hapus ChefHat dari import lucide-react
-import { Loader2, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
 
 export default function RegisterPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [usernameError, setUsernameError] = useState("");
+  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
+  const [checkingUsername, setCheckingUsername] = useState(false);
 
-  // State untuk visibilitas password (terpisah antara password utama & konfirmasi)
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const usernameCheckTimeout = useRef<NodeJS.Timeout>();
+
+  // Function untuk check username availability
+  const checkUsernameAvailability = async (username: string) => {
+    if (username.length < 3) {
+      setUsernameError("Username minimal 3 karakter");
+      setUsernameAvailable(null);
+      return;
+    }
+
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+      setUsernameError("Username hanya boleh huruf, angka, dan underscore");
+      setUsernameAvailable(null);
+      return;
+    }
+
+    setCheckingUsername(true);
+    setUsernameError("");
+
+    try {
+      const res = await fetch("/api/auth/check-username", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: username.toLowerCase() }),
+      });
+
+      const data = await res.json();
+      
+      if (data.available) {
+        setUsernameAvailable(true);
+        setUsernameError("");
+      } else {
+        setUsernameAvailable(false);
+        setUsernameError(data.message || "Username sudah digunakan");
+      }
+    } catch (err) {
+      console.error("Error checking username:", err);
+      setUsernameAvailable(null);
+    } finally {
+      setCheckingUsername(false);
+    }
+  };
+
+  const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const username = e.target.value.trim();
+    
+    // Clear previous timeout
+    if (usernameCheckTimeout.current) {
+      clearTimeout(usernameCheckTimeout.current);
+    }
+
+    // Set new timeout to avoid excessive API calls
+    usernameCheckTimeout.current = setTimeout(() => {
+      if (username) {
+        checkUsernameAvailability(username);
+      } else {
+        setUsernameAvailable(null);
+        setUsernameError("");
+      }
+    }, 500);
+  };
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -28,14 +90,20 @@ export default function RegisterPage() {
 
     const formData = new FormData(event.currentTarget);
     const fullName = formData.get("fullname");
-    const username = formData.get("username");
+    const username = (formData.get("username") as string).toLowerCase();
     const password = formData.get("password") as string;
     const confirmPassword = formData.get("confirmPassword") as string;
     const phone = formData.get("phone");
 
-    // 1. VALIDASI MANUAL: Cek apakah password sama
+    // Validasi client-side
     if (password !== confirmPassword) {
       setError("Kata sandi tidak cocok! Silakan periksa kembali.");
+      setIsLoading(false);
+      return;
+    }
+
+    if (usernameAvailable === false) {
+      setError("Username sudah digunakan. Pilih username lain.");
       setIsLoading(false);
       return;
     }
@@ -100,14 +168,33 @@ export default function RegisterPage() {
             
             <div className="grid gap-2">
               <Label htmlFor="username">Username</Label>
-              <Input 
-                id="username" 
-                name="username" 
-                type="text" 
-                placeholder="cth: adidaputra (tanpa spasi)" 
-                required 
-                disabled={isLoading}
-              />
+              <div className="relative">
+                <Input 
+                  id="username" 
+                  name="username" 
+                  type="text" 
+                  placeholder="cth: adidaputra (tanpa spasi)" 
+                  required 
+                  disabled={isLoading}
+                  onChange={handleUsernameChange}
+                  className={`pr-10 ${usernameAvailable === true ? "border-green-500 focus:ring-green-500" : usernameAvailable === false ? "border-red-500 focus:ring-red-500" : ""}`}
+                />
+                {checkingUsername && (
+                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 animate-spin text-slate-400" />
+                )}
+                {!checkingUsername && usernameAvailable === true && (
+                  <CheckCircle className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-green-500" />
+                )}
+                {!checkingUsername && usernameAvailable === false && (
+                  <AlertCircle className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-red-500" />
+                )}
+              </div>
+              {usernameError && (
+                <p className="text-sm text-red-600">{usernameError}</p>
+              )}
+              {usernameAvailable === true && (
+                <p className="text-sm text-green-600">Username tersedia!</p>
+              )}
             </div>
 
             {/* INPUT PASSWORD UTAMA */}
