@@ -31,7 +31,7 @@ export async function POST(request: Request) {
 
     const body = await request.json();
 
-    const { items, totalPrice, note, deliveryTime } = body;
+    const { items, totalPrice, note, deliveryTime, address } = body;
 
     console.log("ORDER DATA MASUK:", { user: session.user.name, total: totalPrice, note: note, deliveryTime: deliveryTime });
 
