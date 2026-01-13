@@ -3,8 +3,7 @@ import { xenditClient } from "@/lib/xendit";
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
-
-
+import { pusherServer } from "@/lib/pusher";
 
 export async function POST(request: Request) {
   try {
@@ -37,16 +36,41 @@ export async function POST(request: Request) {
     const currentStatus = invoice.status.toUpperCase();
 
     if (currentStatus === "PAID" || currentStatus === "SETTLED") {
-      // Update Order jadi PROCESSING
-      await prisma.order.update({
-        where: { id: orderId },
-        data: { status: "PROCESSING" }
-      });
+      // Transaction untuk update order, payment, dan kurangi stock
+      await prisma.$transaction(async (tx) => {
+        // Update Order jadi PROCESSING
+        await tx.order.update({
+          where: { id: orderId },
+          data: { status: "PROCESSING" }
+        });
 
-      // Update Payment jadi PAID
-      await prisma.payment.update({
-        where: { id: payment.id },
-        data: { status: "PAID", paidAt: new Date() }
+        // Update Payment jadi PAID
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: { status: "PAID", paidAt: new Date() }
+        });
+
+        // Ambil order items untuk kurangi stock
+        const orderItems = await tx.orderItem.findMany({
+          where: { orderId: orderId },
+          include: { menu: true }
+        });
+
+        // Kurangi stock untuk setiap menu
+        for (const item of orderItems) {
+          await tx.menu.update({
+            where: { id: item.menuId },
+            data: { stock: { decrement: item.quantity } }
+          });
+
+          // Trigger Pusher untuk stock update realtime
+          await pusherServer.trigger("stock-updates", "stock-changed", {
+            menuId: item.menuId,
+            menuName: item.menu?.name,
+            newStock: (item.menu?.stock || 0) - item.quantity,
+            quantityDecrease: item.quantity
+          });
+        }
       });
 
       return NextResponse.json({ status: "PAID", message: "Pembayaran Lunas! Pesanan diproses." });

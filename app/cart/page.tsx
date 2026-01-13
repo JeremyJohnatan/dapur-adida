@@ -5,10 +5,33 @@ import Image from "next/image";
 import { useCart } from "@/context/CartContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Trash2, Plus, Minus, ArrowLeft, ShoppingBag, CreditCard, Loader2 } from "lucide-react";
-import { useSession } from "next-auth/react";
+import AddressForm from "@/components/AddressForm";
+import { 
+  Trash2, Plus, Minus, ArrowLeft, ShoppingBag, CreditCard, Loader2, AlertCircle, 
+  User, LogOut, LayoutDashboard, ClipboardList, MessageCircle 
+} from "lucide-react";
+import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export default function CartPage() {
   const { items, removeFromCart, addToCart, decreaseQuantity, totalPrice, clearCart } = useCart();
@@ -16,10 +39,35 @@ export default function CartPage() {
   const router = useRouter();
   
   const [isCheckingOut, setIsCheckingOut] = useState(false);
-  // 1. STATE UNTUK MENAMPUNG CATATAN
-  const [note, setNote] = useState(""); 
-
+  const [note, setNote] = useState("");
+  const [address, setAddress] = useState<string | null>(null);
+  const [isLoadingAddress, setIsLoadingAddress] = useState(true);
   const [animatingId, setAnimatingId] = useState<string | null>(null);
+
+  // Cek apakah user adalah admin
+  const isAdmin = session?.user?.role === "ADMIN";
+
+  // Fetch alamat user saat halaman load
+  useEffect(() => {
+    const fetchUserAddress = async () => {
+      if (!session) {
+        setIsLoadingAddress(false);
+        return;
+      }
+
+      try {
+        const res = await fetch("/api/address");
+        const data = await res.json();
+        setAddress(data.address || null);
+      } catch (error) {
+        console.error("Error fetching address:", error);
+      } finally {
+        setIsLoadingAddress(false);
+      }
+    };
+
+    fetchUserAddress();
+  }, [session]);
 
   const triggerAnimation = (id: string) => {
     setAnimatingId(id);
@@ -41,6 +89,12 @@ export default function CartPage() {
       return;
     }
 
+    // VALIDASI ALAMAT WAJIB DIISI
+    if (!address || address.trim() === "") {
+      alert("Alamat pengiriman wajib diisi sebelum checkout. Silakan lengkapi alamat Anda terlebih dahulu.");
+      return;
+    }
+
     setIsCheckingOut(true);
 
     try {
@@ -55,17 +109,17 @@ export default function CartPage() {
         }
       }
 
-      // DEBUG: Cek di console browser (F12) apakah note ada isinya
       console.log("Mengirim Order dengan Note:", note);
+      console.log("Alamat Pengiriman:", address);
 
       const res = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // 2. PASTIKAN 'note' ADA DI SINI
         body: JSON.stringify({
           items: items,
           totalPrice: totalPrice,
-          note: note, 
+          note: note,
+          address: address,
         }),
       });
 
@@ -90,7 +144,102 @@ export default function CartPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
-      <nav className="sticky top-0 z-50 w-full bg-white/95 backdrop-blur-md border-b px-4 py-4 shadow-sm">
+      {/* ===== NAVBAR ===== */}
+      <nav className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur-md shadow-sm transition-all">
+        <div className="container mx-auto px-4 h-20 flex items-center justify-between relative">
+          
+          {/* LOGO & BRAND NAME (Kiri) */}
+          <div className="flex-shrink-0 z-20">
+            <Link href="/" className="flex items-center gap-3 group">
+              {/* Gambar Logo */}
+              <div className="relative h-10 w-10 md:h-12 md:w-12 overflow-hidden rounded-full border-2 border-primary/20 group-hover:border-primary transition-colors duration-300 shadow-sm">
+                <Image src="/logo_dapuradida.jpeg" alt="Logo Dapur Adida" fill className="object-cover" />
+              </div>
+              
+              {/* TULISAN DAPUR ADIDA */}
+              <span className="text-xl md:text-2xl font-black tracking-tight text-slate-900 group-hover:text-primary transition-colors">
+                Dapur Adida<span className="text-primary">.</span>
+              </span>
+            </Link>
+          </div>
+
+          {/* BAGIAN KANAN */}
+          <div className="flex items-center gap-2 md:gap-3 z-20">
+            {session ? (
+              <div className="flex items-center gap-2 md:gap-4">
+                {isAdmin && (
+                  <Link href="/admin" className="relative p-2 hover:bg-slate-100 rounded-full transition-colors text-primary" title="Ke Dashboard Admin">
+                    <LayoutDashboard className="h-5 w-5 md:h-6 md:w-6" />
+                  </Link>
+                )}
+                <Link href="/orders">
+                    <Button variant="ghost" className="flex items-center gap-2 text-slate-700 font-bold hover:text-primary hover:bg-primary/5 px-2 md:px-4">
+                      <ClipboardList className="h-5 w-5 text-primary" />
+                      <span className="hidden sm:inline">Pesanan</span>
+                    </Button>
+                </Link>
+                <Link href="/chat" className="relative p-2 hover:bg-slate-100 rounded-full transition-colors hidden sm:block" title="Chat Admin">
+                  <MessageCircle className="h-5 w-6 md:h-6 md:w-6 text-slate-600 hover:text-primary" />
+                </Link>
+
+                {/* === DROPDOWN MENU PROFILE === */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="flex items-center gap-2 text-sm font-bold text-slate-600 bg-slate-100 pl-3 pr-4 py-2 rounded-full hover:bg-slate-200 transition-colors">
+                      <User className="h-4 w-4" />
+                      <span className="capitalize truncate max-w-[100px] hidden md:inline">{session.user?.name || "Kakak"}</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56 bg-white border-slate-100 shadow-xl">
+                    <DropdownMenuLabel className="font-bold text-slate-900">Akun Saya</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <Link href="/profile">
+                      <DropdownMenuItem className="cursor-pointer focus:bg-slate-50 focus:text-primary font-medium">
+                        <User className="mr-2 h-4 w-4" />
+                        <span>Profile</span>
+                      </DropdownMenuItem>
+                    </Link>
+                    <DropdownMenuSeparator />
+                    
+                    {/* Logout Logic inside Dropdown */}
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-red-600 cursor-pointer focus:text-red-600 focus:bg-red-50 font-medium">
+                          <LogOut className="mr-2 h-4 w-4" />
+                          <span>Keluar</span>
+                        </DropdownMenuItem>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Konfirmasi Keluar</AlertDialogTitle>
+                          <AlertDialogDescription>Apakah Anda yakin ingin keluar dari akun?</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Batal</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => signOut({ callbackUrl: "/" })} className="bg-red-600 hover:bg-red-700 focus:ring-red-600 text-white">Ya, Keluar</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                {/* === END DROPDOWN === */}
+
+              </div>
+            ) : (
+              <>
+                <Link href="/login"><Button variant="ghost" size="sm" className="hover:text-primary hover:bg-primary/5 font-semibold">Masuk</Button></Link>
+                <Link href="/register"><Button size="sm" className="rounded-full px-4 md:px-6 bg-primary hover:bg-primary/90 shadow-lg font-bold">Daftar</Button></Link>
+              </>
+            )}
+          </div>
+        </div>
+      </nav>
+
+      {/* NAVBAR SECONDARY */}
+
+      {/* NAVBAR SECONDARY */}
+      <nav className="sticky top-20 z-40 w-full bg-white/95 backdrop-blur-md border-b px-4 py-4 shadow-sm">
         <div className="container mx-auto flex items-center justify-center relative">
           <Link href="/menu" className="absolute left-0 flex items-center gap-2 text-slate-600 hover:text-primary transition-colors">
             <ArrowLeft className="h-5 w-5" />
@@ -114,6 +263,14 @@ export default function CartPage() {
           </div>
         ) : (
           <div className="space-y-6">
+            {/* FORM ALAMAT PENGIRIMAN - WAJIB DIISI */}
+            {!isLoadingAddress && (
+              <AddressForm 
+                onAddressSaved={setAddress}
+                initialAddress={address || undefined}
+              />
+            )}
+
             <div className="space-y-4">
               {items.map((item, index) => (
                 <Card 
@@ -156,7 +313,7 @@ export default function CartPage() {
               ))}
             </div>
             
-            {/* 3. INPUT TEXTAREA (Wajib Terhubung ke State 'note') */}
+            {/* INPUT TEXTAREA CATATAN PESANAN */}
             <div className="bg-white p-4 rounded-2xl shadow-sm space-y-2 border border-slate-100">
               <label htmlFor="note" className="font-bold text-slate-700 text-sm flex items-center gap-2">
                 <span className="bg-yellow-100 text-yellow-700 p-1 rounded">Catatan Pesanan</span> (Opsional)
@@ -171,6 +328,17 @@ export default function CartPage() {
               />
             </div>
 
+            {/* ALERT JIKA ALAMAT KOSONG */}
+            {!address && !isLoadingAddress && items.length > 0 && (
+              <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="font-semibold text-red-900">Alamat Belum Diisi</h4>
+                  <p className="text-sm text-red-700 mt-1">Lengkapi alamat pengiriman di atas untuk melanjutkan ke pembayaran.</p>
+                </div>
+              </div>
+            )}
+
             <Card className="border-none shadow-lg bg-white rounded-2xl sticky bottom-4 animate-in slide-in-from-bottom-10 fade-in duration-700">
               <CardContent className="p-6 space-y-4">
                 <div className="flex justify-between items-center text-lg font-bold text-slate-900">
@@ -181,7 +349,11 @@ export default function CartPage() {
                   <Button variant="outline" onClick={clearCart} disabled={isCheckingOut} className="flex-1 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 rounded-xl">
                     <Trash2 className="h-4 w-4 mr-2" /> Kosongkan
                   </Button>
-                  <Button onClick={handleCheckout} disabled={isCheckingOut} className="flex-[2] bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-lg shadow-blue-600/20">
+                  <Button 
+                    onClick={handleCheckout} 
+                    disabled={isCheckingOut || !address || address.trim() === ""} 
+                    className="flex-[2] bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-lg shadow-blue-600/20 disabled:bg-slate-300 disabled:cursor-not-allowed"
+                  >
                     {isCheckingOut ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Memproses...</> : <><CreditCard className="h-4 w-4 mr-2" /> Bayar Sekarang</>}
                   </Button>
                 </div>

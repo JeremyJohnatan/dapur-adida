@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, CheckCircle, ChefHat, Clock, XCircle, StickyNote, MessageCircle } from "lucide-react"; 
+import { Loader2, CheckCircle, ChefHat, Clock, XCircle, StickyNote, MessageCircle, MapPin, Phone, Mail } from "lucide-react"; 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 // Tipe data
@@ -21,8 +21,9 @@ interface Order {
   totalAmount: string;
   status: string;
   createdAt: string;
-  note?: string | null; // Pastikan tipe data note ada
-  user: { id: string; fullName: string; email: string }; 
+  note?: string | null;
+  address?: string | null; // Alamat pengiriman
+  user: { id: string; fullName: string; email: string; phoneNumber?: string }; 
   items: OrderItem[];
 }
 
@@ -113,6 +114,35 @@ export default function AdminOrdersPage() {
                     </div>
 
                     <p className="text-sm text-slate-500">{new Date(order.createdAt).toLocaleString('id-ID')}</p>
+
+                    {/* Info Kontak Pelanggan */}
+                    <div className="mt-3 space-y-1.5 text-sm text-slate-600">
+                      {order.user?.phoneNumber && order.user.phoneNumber !== "-" && (
+                        <div className="flex items-center gap-2">
+                          <Phone className="w-4 h-4 text-slate-400" />
+                          <span>{order.user.phoneNumber}</span>
+                        </div>
+                      )}
+                      {order.user?.email && order.user.email !== "-" && (
+                        <div className="flex items-center gap-2">
+                          <Mail className="w-4 h-4 text-slate-400" />
+                          <span>{order.user.email}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Alamat Pengiriman */}
+                    {order.address && (
+                      <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                        <div className="flex items-start gap-2">
+                          <MapPin className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-xs font-bold text-blue-700 uppercase mb-1">Alamat Pengiriman:</p>
+                            <p className="text-sm text-blue-900 leading-relaxed">{order.address}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Detail Item & Notes */}

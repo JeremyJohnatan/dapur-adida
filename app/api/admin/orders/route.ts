@@ -20,7 +20,9 @@ export async function GET(request: Request) {
       id: order.id,
       status: order.status,
       // Field note wajib ada agar muncul di Admin
-      note: order.note || null, 
+      note: order.note || null,
+      // Field address dari user
+      address: order.user?.address || null,
       totalAmount: order.totalAmount ? order.totalAmount.toString() : "0",
       createdAt: order.createdAt, 
       paymentUrl: order.payment?.paymentUrl || null,
@@ -29,6 +31,7 @@ export async function GET(request: Request) {
         id: order.user?.id || "", 
         fullName: order.user?.name || order.user?.fullName || "Pelanggan (Tanpa Nama)",
         email: order.user?.email || "-",
+        phoneNumber: order.user?.phoneNumber || "-",
       },
 
       items: order.items.map((item: any) => ({

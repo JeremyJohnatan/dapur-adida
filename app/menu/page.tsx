@@ -6,8 +6,32 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, ArrowLeft, ShoppingCart, ChefHat, Star, Plus, Check, CheckCircle2 } from "lucide-react";
+import { 
+  Loader2, ArrowLeft, ShoppingCart, ChefHat, Star, Plus, Check, CheckCircle2, 
+  User, LogOut, LayoutDashboard, ClipboardList, MessageCircle
+} from "lucide-react";
 import { useCart } from "@/context/CartContext";
+import { useSession, signOut } from "next-auth/react";
+import { pusherClient } from "@/lib/pusher";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 // Definisikan tipe data Menu
 interface Menu {
@@ -30,7 +54,11 @@ export default function MenuPage() {
   // State untuk toggle tampil/sembunyi review per menu
   const [showReviews, setShowReviews] = useState<Record<string, boolean>>({});
   
-  const { addToCart, totalItems } = useCart(); 
+  const { addToCart, totalItems } = useCart();
+  const { data: session } = useSession();
+
+  // Cek apakah user adalah admin
+  const isAdmin = session?.user?.role === "ADMIN"; 
 
   // --- STATE ANIMASI & NOTIFIKASI ---
   const [isCartBumping, setIsCartBumping] = useState(false);
@@ -66,6 +94,23 @@ export default function MenuPage() {
     };
 
     fetchMenus();
+
+    // --- PUSHER LISTENER UNTUK REAL-TIME STOCK UPDATE ---
+    const stockChannel = pusherClient.subscribe("stock-updates");
+    stockChannel.bind("stock-changed", (data: any) => {
+      setMenus((prevMenus) =>
+        prevMenus.map((menu) =>
+          menu.id === data.menuId
+            ? { ...menu, stock: data.newStock }
+            : menu
+        )
+      );
+    });
+
+    return () => {
+      stockChannel.unbind_all();
+      pusherClient.unsubscribe("stock-updates");
+    };
   }, []);
 
   // --- FUNGSI HANDLE ADD TO CART ---
@@ -134,27 +179,114 @@ export default function MenuPage() {
       )}
 
       {/* Navbar */}
-      <nav className="sticky top-0 z-50 w-full bg-white/95 backdrop-blur-md border-b px-4 py-4 shadow-sm">
-        <div className="container mx-auto flex justify-between items-center">
+      <nav className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur-md shadow-sm transition-all">
+        <div className="container mx-auto px-4 h-20 flex items-center justify-between relative">
+          
+          {/* LOGO & BRAND NAME (Kiri) */}
+          <div className="flex-shrink-0 z-20">
+            <Link href="/" className="flex items-center gap-3 group">
+              {/* Gambar Logo */}
+              <div className="relative h-10 w-10 md:h-12 md:w-12 overflow-hidden rounded-full border-2 border-primary/20 group-hover:border-primary transition-colors duration-300 shadow-sm">
+                <Image src="/logo_dapuradida.jpeg" alt="Logo Dapur Adida" fill className="object-cover" />
+              </div>
+              
+              {/* TULISAN DAPUR ADIDA */}
+              <span className="text-xl md:text-2xl font-black tracking-tight text-slate-900 group-hover:text-primary transition-colors">
+                Dapur Adida<span className="text-primary">.</span>
+              </span>
+            </Link>
+          </div>
+
+          {/* BAGIAN KANAN */}
+          <div className="flex items-center gap-2 md:gap-3 z-20">
+            {session ? (
+              <div className="flex items-center gap-2 md:gap-4">
+                {isAdmin && (
+                  <Link href="/admin" className="relative p-2 hover:bg-slate-100 rounded-full transition-colors text-primary" title="Ke Dashboard Admin">
+                    <LayoutDashboard className="h-5 w-5 md:h-6 md:w-6" />
+                  </Link>
+                )}
+                <Link href="/orders">
+                    <Button variant="ghost" className="flex items-center gap-2 text-slate-700 font-bold hover:text-primary hover:bg-primary/5 px-2 md:px-4">
+                      <ClipboardList className="h-5 w-5 text-primary" />
+                      <span className="hidden sm:inline">Pesanan</span>
+                    </Button>
+                </Link>
+                <Link href="/chat" className="relative p-2 hover:bg-slate-100 rounded-full transition-colors hidden sm:block" title="Chat Admin">
+                  <MessageCircle className="h-5 w-6 md:h-6 md:w-6 text-slate-600 hover:text-primary" />
+                </Link>
+                <Link href="/cart" className="relative p-2 hover:bg-slate-100 rounded-full transition-colors mr-2">
+                  <ShoppingCart className="h-5 w-5 md:h-6 md:w-6 text-slate-600 hover:text-primary" />
+                  {totalItems > 0 && (
+                    <span className="absolute top-0 right-0 bg-primary text-white text-[10px] font-bold h-4 w-4 rounded-full flex items-center justify-center shadow-sm animate-in zoom-in">
+                      {totalItems}
+                    </span>
+                  )}
+                </Link>
+
+                {/* === DROPDOWN MENU PROFILE === */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="flex items-center gap-2 text-sm font-bold text-slate-600 bg-slate-100 pl-3 pr-4 py-2 rounded-full hover:bg-slate-200 transition-colors">
+                      <User className="h-4 w-4" />
+                      <span className="capitalize truncate max-w-[100px] hidden md:inline">{session.user?.name || "Kakak"}</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56 bg-white border-slate-100 shadow-xl">
+                    <DropdownMenuLabel className="font-bold text-slate-900">Akun Saya</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <Link href="/profile">
+                      <DropdownMenuItem className="cursor-pointer focus:bg-slate-50 focus:text-primary font-medium">
+                        <User className="mr-2 h-4 w-4" />
+                        <span>Profile</span>
+                      </DropdownMenuItem>
+                    </Link>
+                    <DropdownMenuSeparator />
+                    
+                    {/* Logout Logic inside Dropdown */}
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-red-600 cursor-pointer focus:text-red-600 focus:bg-red-50 font-medium">
+                          <LogOut className="mr-2 h-4 w-4" />
+                          <span>Keluar</span>
+                        </DropdownMenuItem>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Konfirmasi Keluar</AlertDialogTitle>
+                          <AlertDialogDescription>Apakah Anda yakin ingin keluar dari akun?</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Batal</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => signOut({ callbackUrl: "/" })} className="bg-red-600 hover:bg-red-700 focus:ring-red-600 text-white">Ya, Keluar</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                {/* === END DROPDOWN === */}
+
+              </div>
+            ) : (
+              <>
+                <Link href="/login"><Button variant="ghost" size="sm" className="hover:text-primary hover:bg-primary/5 font-semibold">Masuk</Button></Link>
+                <Link href="/register"><Button size="sm" className="rounded-full px-4 md:px-6 bg-primary hover:bg-primary/90 shadow-lg font-bold">Daftar</Button></Link>
+              </>
+            )}
+          </div>
+        </div>
+      </nav>
+
+      {/* NAVBAR SECONDARY */}
+      <nav className="sticky top-20 z-40 w-full bg-white/95 backdrop-blur-md border-b px-4 py-4 shadow-sm">
+        <div className="container mx-auto flex items-center gap-4">
           <Link href="/" className="flex items-center gap-2 text-slate-600 hover:text-primary transition-colors font-medium">
             <ArrowLeft className="h-5 w-5" />
             <span>Kembali</span>
           </Link>
           
           <h1 className="text-xl font-bold text-primary">Daftar Menu</h1>
-          
-          {/* Ikon Keranjang dengan Animasi Bump */}
-          <Link href="/cart" className="relative cursor-pointer p-2">
-            <div className={`transition-transform duration-300 ${isCartBumping ? "scale-125 text-primary" : "scale-100 text-slate-600 hover:text-primary"}`}>
-               <ShoppingCart className="h-6 w-6" />
-            </div>
-            
-            {totalItems > 0 && (
-              <span className={`absolute top-0 right-0 bg-primary text-white text-[10px] font-bold h-4 w-4 rounded-full flex items-center justify-center shadow-sm transition-transform duration-300 ${isCartBumping ? "scale-125" : "scale-100"}`}>
-                {totalItems}
-              </span>
-            )}
-          </Link>
         </div>
       </nav>
 

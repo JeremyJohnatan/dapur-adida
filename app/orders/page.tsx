@@ -23,7 +23,9 @@ import {
   LogOut,
   CreditCard, 
   RefreshCcw,
-  Star
+  Star,
+  LayoutDashboard,
+  ClipboardList
 } from "lucide-react";
 import { pusherClient } from "@/lib/pusher";
 
@@ -38,6 +40,15 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 import {
   Dialog,
@@ -77,6 +88,9 @@ export default function OrderHistoryPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [checkingId, setCheckingId] = useState<string | null>(null);
+
+  // Cek apakah user adalah admin
+  const isAdmin = session?.user?.role === "ADMIN";
 
   // State untuk Review Modal
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
@@ -241,76 +255,96 @@ export default function OrderHistoryPage() {
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
       
-      {/* ===== NAVBAR (Update Sesuai Request) ===== */}
-      <nav className="sticky top-0 z-50 w-full bg-white/95 backdrop-blur-md border-b px-4 py-4 shadow-sm">
-        <div className="container mx-auto flex items-center justify-center relative h-10"> {/* h-10 agar tinggi konsisten */}
+      {/* ===== NAVBAR LENGKAP ===== */}
+      <nav className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur-md shadow-sm transition-all">
+        <div className="container mx-auto px-4 h-20 flex items-center justify-between relative">
           
-          {/* KIRI: Logo / Back Button */}
-          <div className="absolute left-0 flex items-center">
-             <Link href="/" className="flex items-center gap-2 text-slate-600 hover:text-primary transition-colors">
-              <ArrowLeft className="h-5 w-5" />
-              <span className="font-medium hidden sm:block">Kembali ke Home</span>
+          {/* LOGO & BRAND NAME (Kiri) */}
+          <div className="flex-shrink-0 z-20">
+            <Link href="/" className="flex items-center gap-3 group">
+              {/* Gambar Logo */}
+              <div className="relative h-10 w-10 md:h-12 md:w-12 overflow-hidden rounded-full border-2 border-primary/20 group-hover:border-primary transition-colors duration-300 shadow-sm">
+                <Image src="/logo_dapuradida.jpeg" alt="Logo Dapur Adida" fill className="object-cover" />
+              </div>
+              
+              {/* TULISAN DAPUR ADIDA */}
+              <span className="text-xl md:text-2xl font-black tracking-tight text-slate-900 group-hover:text-primary transition-colors">
+                Dapur Adida<span className="text-primary">.</span>
+              </span>
             </Link>
           </div>
 
-          {/* TENGAH: Judul Halaman */}
-          <h1 className="text-xl font-bold text-primary">Pesanan Saya</h1>
+          {/* BAGIAN KANAN */}
+          <div className="flex items-center gap-2 md:gap-3 z-20">
+            {session ? (
+              <div className="flex items-center gap-2 md:gap-4">
+                {isAdmin && (
+                  <Link href="/admin" className="relative p-2 hover:bg-slate-100 rounded-full transition-colors text-primary" title="Ke Dashboard Admin">
+                    <LayoutDashboard className="h-5 w-5 md:h-6 md:w-6" />
+                  </Link>
+                )}
+                <Link href="/chat" className="relative p-2 hover:bg-slate-100 rounded-full transition-colors hidden sm:block" title="Chat Admin">
+                  <MessageCircle className="h-5 w-6 md:h-6 md:w-6 text-slate-600 hover:text-primary" />
+                </Link>
+                <Link href="/cart" className="relative p-2 hover:bg-slate-100 rounded-full transition-colors mr-2">
+                  <ShoppingCart className="h-5 w-5 md:h-6 md:w-6 text-slate-600 hover:text-primary" />
+                  {totalItems > 0 && (
+                    <span className="absolute top-0 right-0 bg-primary text-white text-[10px] font-bold h-4 w-4 rounded-full flex items-center justify-center shadow-sm animate-in zoom-in">
+                      {totalItems}
+                    </span>
+                  )}
+                </Link>
 
-          {/* KANAN: Menu User (Tanpa Tombol 'Pesanan' karena ini halaman pesanan) */}
-          <div className="absolute right-0 flex items-center gap-2 md:gap-3">
-            
-            {/* 1. ICON CHAT */}
-            <Link href="/chat" className="relative p-2 hover:bg-slate-100 rounded-full transition-colors hidden sm:block" title="Chat Admin">
-              <MessageCircle className="h-5 w-5 md:h-6 md:w-6 text-slate-600 hover:text-primary" />
-            </Link>
+                {/* === DROPDOWN MENU PROFILE === */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="flex items-center gap-2 text-sm font-bold text-slate-600 bg-slate-100 pl-3 pr-4 py-2 rounded-full hover:bg-slate-200 transition-colors">
+                      <User className="h-4 w-4" />
+                      <span className="capitalize truncate max-w-[100px] hidden md:inline">{session.user?.name || "Kakak"}</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56 bg-white border-slate-100 shadow-xl">
+                    <DropdownMenuLabel className="font-bold text-slate-900">Akun Saya</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <Link href="/profile">
+                      <DropdownMenuItem className="cursor-pointer focus:bg-slate-50 focus:text-primary font-medium">
+                        <User className="mr-2 h-4 w-4" />
+                        <span>Profile</span>
+                      </DropdownMenuItem>
+                    </Link>
+                    <DropdownMenuSeparator />
+                    
+                    {/* Logout Logic inside Dropdown */}
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-red-600 cursor-pointer focus:text-red-600 focus:bg-red-50 font-medium">
+                          <LogOut className="mr-2 h-4 w-4" />
+                          <span>Keluar</span>
+                        </DropdownMenuItem>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Konfirmasi Keluar</AlertDialogTitle>
+                          <AlertDialogDescription>Apakah Anda yakin ingin keluar dari akun?</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Batal</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => signOut({ callbackUrl: "/" })} className="bg-red-600 hover:bg-red-700 focus:ring-red-600 text-white">Ya, Keluar</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
 
-            {/* 2. ICON KERANJANG */}
-            <Link href="/cart" className="relative p-2 hover:bg-slate-100 rounded-full transition-colors mr-1">
-              <ShoppingCart className="h-5 w-5 md:h-6 md:w-6 text-slate-600 hover:text-primary" />
-              {totalItems > 0 && (
-                <span className="absolute top-0 right-0 bg-primary text-white text-[10px] font-bold h-4 w-4 rounded-full flex items-center justify-center shadow-sm animate-in zoom-in">
-                  {totalItems}
-                </span>
-              )}
-            </Link>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                {/* === END DROPDOWN === */}
 
-            {/* 3. USER PROFILE */}
-            <div className="hidden md:flex items-center gap-2 text-sm font-bold text-slate-600 bg-slate-100 px-4 py-2 rounded-full">
-              <User className="h-4 w-4" />
-              <span className="capitalize truncate max-w-[100px]">{session?.user?.name || "Kakak"}</span>
-            </div>
-            
-            {/* 4. TOMBOL KELUAR (Dengan Konfirmasi) */}
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="rounded-full text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all"
-                  title="Keluar"
-                >
-                  <LogOut className="h-5 w-5" /> 
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Konfirmasi Keluar</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Apakah Anda yakin ingin keluar dari akun?
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Batal</AlertDialogCancel>
-                  <AlertDialogAction 
-                    onClick={() => signOut({ callbackUrl: "/" })}
-                    className="bg-red-600 hover:bg-red-700 focus:ring-red-600 text-white"
-                  >
-                    Ya, Keluar
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-
+              </div>
+            ) : (
+              <>
+                <Link href="/login"><Button variant="ghost" size="sm" className="hover:text-primary hover:bg-primary/5 font-semibold">Masuk</Button></Link>
+                <Link href="/register"><Button size="sm" className="rounded-full px-4 md:px-6 bg-primary hover:bg-primary/90 shadow-lg font-bold">Daftar</Button></Link>
+              </>
+            )}
           </div>
         </div>
       </nav>

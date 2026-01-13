@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Loader2, Plus, Pencil, Trash2, ChefHat, Search, ImageIcon, Star } from "lucide-react"; // Import Star
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch"; // Pastikan kamu punya component Switch ui shadcn
+import { pusherClient } from "@/lib/pusher";
 
 // --- KONFIGURASI CLOUDINARY ---
 const CLOUDINARY_CLOUD_NAME = "dvntlphzd"; 
@@ -68,6 +69,23 @@ export default function AdminMenuPage() {
 
   useEffect(() => {
     fetchMenus();
+
+    // --- PUSHER LISTENER UNTUK REAL-TIME STOCK UPDATE ---
+    const stockChannel = pusherClient.subscribe("stock-updates");
+    stockChannel.bind("stock-changed", (data: any) => {
+      setMenus((prevMenus) =>
+        prevMenus.map((menu) =>
+          menu.id === data.menuId
+            ? { ...menu, stock: data.newStock }
+            : menu
+        )
+      );
+    });
+
+    return () => {
+      stockChannel.unbind_all();
+      pusherClient.unsubscribe("stock-updates");
+    };
   }, []);
 
   // --- HANDLER UPLOAD GAMBAR ---
