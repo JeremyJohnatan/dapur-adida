@@ -41,6 +41,7 @@ export default function CartPage() {
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [note, setNote] = useState("");
   const [address, setAddress] = useState<string | null>(null);
+  const [deliveryTime, setDeliveryTime] = useState("");
   const [isLoadingAddress, setIsLoadingAddress] = useState(true);
   const [animatingId, setAnimatingId] = useState<string | null>(null);
 
@@ -93,6 +94,12 @@ export default function CartPage() {
       return;
     }
 
+    // VALIDASI WAKTU PENGIRIMAN WAJIB DIISI
+    if (!deliveryTime || deliveryTime.trim() === "") {
+      alert("Waktu pengiriman wajib dipilih sebelum checkout. Silakan pilih jam pengiriman yang Anda inginkan.");
+      return;
+    }
+
     setIsCheckingOut(true);
 
     try {
@@ -109,6 +116,7 @@ export default function CartPage() {
 
       console.log("Mengirim Order dengan Note:", note);
       console.log("Alamat Pengiriman:", address);
+      console.log("Waktu Pengiriman:", deliveryTime);
 
       const res = await fetch("/api/orders", {
         method: "POST",
@@ -118,6 +126,7 @@ export default function CartPage() {
           totalPrice: totalPrice,
           note: note,
           address: address,
+          deliveryTime: deliveryTime,
         }),
       });
 
@@ -326,6 +335,22 @@ export default function CartPage() {
               />
             </div>
 
+            {/* INPUT WAKTU PENGIRIMAN */}
+            <div className="bg-white p-4 rounded-2xl shadow-sm space-y-2 border border-slate-100">
+              <label htmlFor="deliveryTime" className="font-bold text-slate-700 text-sm flex items-center gap-2">
+                <span className="bg-blue-100 text-blue-700 p-1 rounded">Tanggal & Waktu Pengiriman</span> (Wajib)
+              </label>
+              <input
+                id="deliveryTime"
+                type="datetime-local"
+                className="w-full border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 bg-slate-50"
+                value={deliveryTime}
+                onChange={(e) => setDeliveryTime(e.target.value)}
+                required
+              />
+              <p className="text-xs text-slate-500">Pilih tanggal dan jam berapa pesanan Anda ingin dikirim</p>
+            </div>
+
             {/* ALERT JIKA ALAMAT KOSONG */}
             {!address && !isLoadingAddress && items.length > 0 && (
               <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-start gap-3">
@@ -333,6 +358,17 @@ export default function CartPage() {
                 <div>
                   <h4 className="font-semibold text-red-900">Alamat Belum Diisi</h4>
                   <p className="text-sm text-red-700 mt-1">Lengkapi alamat pengiriman di atas untuk melanjutkan ke pembayaran.</p>
+                </div>
+              </div>
+            )}
+
+            {/* ALERT JIKA WAKTU PENGIRIMAN KOSONG */}
+            {!deliveryTime && items.length > 0 && (
+              <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="font-semibold text-orange-900">Waktu Pengiriman Belum Dipilih</h4>
+                  <p className="text-sm text-orange-700 mt-1">Pilih waktu pengiriman yang Anda inginkan untuk melanjutkan ke pembayaran.</p>
                 </div>
               </div>
             )}
@@ -349,7 +385,7 @@ export default function CartPage() {
                   </Button>
                   <Button 
                     onClick={handleCheckout} 
-                    disabled={isCheckingOut || !address || address.trim() === ""} 
+                    disabled={isCheckingOut || !address || address.trim() === "" || !deliveryTime || deliveryTime.trim() === ""} 
                     className="flex-[2] bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-lg shadow-blue-600/20 disabled:bg-slate-300 disabled:cursor-not-allowed"
                   >
                     {isCheckingOut ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Memproses...</> : <><CreditCard className="h-4 w-4 mr-2" /> Bayar Sekarang</>}

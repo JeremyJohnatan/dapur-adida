@@ -91,7 +91,6 @@ export default function OrderHistoryPage() {
 
   const isAdmin = session?.user?.role === "ADMIN";
 
-  // State untuk Review Modal
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<OrderItem | null>(null);
   const [reviewRating, setReviewRating] = useState(5);
@@ -248,7 +247,6 @@ export default function OrderHistoryPage() {
         handleCheckPayment(latestPendingOrder.id, false);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orders.length]); 
 
   const formatRupiah = (price: string | number) => {

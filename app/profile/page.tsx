@@ -23,17 +23,15 @@ export default function ProfilePage() {
     username: "", 
     phoneNumber: "",
     address: "",
-    oldPassword: "", // INPUT BARU
+    oldPassword: "",
     password: "", 
     confirmPassword: ""
   });
 
-  // Redirect jika belum login
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
   }, [status, router]);
 
-  // Fetch Data User
   useEffect(() => {
     if (session?.user) {
       const fetchProfile = async () => {
@@ -63,7 +61,6 @@ export default function ProfilePage() {
     e.preventDefault();
     setSaving(true);
 
-    // 1. Validasi Password
     if (formData.password) {
         if (!formData.oldPassword) {
             alert("Harap masukkan Password Lama untuk mengganti password!");
@@ -90,10 +87,9 @@ export default function ProfilePage() {
         address: formData.address,
       };
 
-      // Kirim password lama dan baru hanya jika user ingin mengganti
       if (formData.password) {
         payload.password = formData.password;
-        payload.oldPassword = formData.oldPassword; // Kirim ke API
+        payload.oldPassword = formData.oldPassword;
       }
 
       const res = await fetch("/api/profile", {
@@ -106,7 +102,6 @@ export default function ProfilePage() {
 
       if (res.ok) {
         alert("Profil berhasil diperbarui! ✅");
-        // Reset field password
         setFormData(prev => ({ ...prev, password: "", confirmPassword: "", oldPassword: "" }));
         router.refresh(); 
       } else {
@@ -192,7 +187,7 @@ export default function ProfilePage() {
                       id="address" 
                       value={formData.address} 
                       onChange={(e) => setFormData({...formData, address: e.target.value})}
-                      className="min-h-[80px]"
+                      className="min-h-[80px] whitespace-pre-wrap break-words overflow-wrap-anywhere"
                     />
                   </div>
               </div>

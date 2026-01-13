@@ -3,7 +3,6 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 
-// --- GET: Ambil semua alamat user ---
 export async function GET(request: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -13,7 +12,7 @@ export async function GET(request: Request) {
 
     const addresses = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { address: true }, // ambil field address dari User
+      select: { address: true },
     });
 
     return NextResponse.json({ address: addresses?.address || null });
@@ -22,7 +21,6 @@ export async function GET(request: Request) {
   }
 }
 
-// --- POST: Simpan/Update alamat user ---
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);

@@ -66,7 +66,6 @@ export default function MenuPage() {
         const res = await fetch("/api/menus");
         const data = await res.json();
         
-        // Fetch rating rata-rata untuk setiap menu
         const menusWithRating = await Promise.all(
           data.map(async (menu: Menu) => {
             try {
@@ -105,37 +104,29 @@ export default function MenuPage() {
     };
   }, []);
 
-  // --- FUNGSI HANDLE ADD TO CART ---
   const handleAddToCart = (menu: any) => {
     if (menu.stock <= 0) {
       alert("Stok menu ini habis!");
       return;
     }
-    // 1. Masukkan ke Context
     addToCart(menu);
 
-    // 2. Tampilkan Pop-up Notifikasi
     setToast({ show: true, message: `Berhasil menambahkan ${menu.name}!` });
     
-    // Hilangkan pop-up setelah 2 detik
     setTimeout(() => {
       setToast(null);
     }, 2000);
 
-    // 3. Animasi Ikon Keranjang (Bump)
     setIsCartBumping(true);
     setTimeout(() => setIsCartBumping(false), 300);
 
-    // 4. Animasi Tombol Item (Berubah Hijau)
     setAddedItems((prev) => ({ ...prev, [menu.id]: true }));
     setTimeout(() => {
       setAddedItems((prev) => ({ ...prev, [menu.id]: false }));
     }, 1000);
   };
 
-  // Fungsi untuk toggle reviews
   const toggleReviews = async (menuId: string) => {
-    // Jika data review belum ada di state, fetch dulu
     if (!reviews[menuId]) {
       try {
         const res = await fetch(`/api/reviews/${menuId}`);
@@ -145,7 +136,6 @@ export default function MenuPage() {
         console.error("Gagal ambil review", error);
       }
     }
-    // Toggle state tampil/sembunyi
     setShowReviews((prev) => ({ ...prev, [menuId]: !prev[menuId] }));
   };
 

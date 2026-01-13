@@ -16,7 +16,6 @@ export const authOptions: AuthOptions = {
           throw new Error("Username dan Password wajib diisi");
         }
 
-        // 1. Cari user berdasarkan USERNAME (case insensitive)
         const user = await prisma.user.findUnique({
           where: { username: credentials.username.toLowerCase() }
         });
@@ -25,7 +24,6 @@ export const authOptions: AuthOptions = {
           throw new Error("Username tidak ditemukan");
         }
 
-        // 2. Cek Password
         const isPasswordValid = await bcrypt.compare(
           credentials.password,
           user.password
@@ -35,7 +33,6 @@ export const authOptions: AuthOptions = {
           throw new Error("Password salah");
         }
 
-        // 3. Login sukses -> Kembalikan data user
         return {
           id: user.id,
           name: user.fullName,

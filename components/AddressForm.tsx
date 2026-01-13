@@ -68,7 +68,7 @@ export default function AddressForm({ onAddressSaved, initialAddress }: AddressF
       </div>
 
       <textarea
-        className="w-full border border-slate-200 rounded-xl p-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none bg-slate-50 placeholder:text-slate-400 transition-all"
+        className="w-full border border-slate-200 rounded-xl p-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none bg-slate-50 placeholder:text-slate-400 transition-all whitespace-pre-wrap break-words overflow-wrap-anywhere"
         placeholder="Contoh: Jl. Sudirman No. 123, Kelurahan Ciledug, Kecamatan Tangerang, Kota Tangerang, Banten 15117"
         rows={4}
         value={address}

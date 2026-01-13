@@ -9,25 +9,24 @@ export async function GET(request: Request) {
     const orders = await prisma.order.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
-        user: true, 
+        user: true,
         items: { include: { menu: true } },
-        payment: true, 
+        payment: true,
       },
     });
 
     const formattedOrders = orders.map((order: any) => ({
       id: order.id,
       status: order.status,
-      // Field note wajib ada agar muncul di Admin
       note: order.note || null,
-      // Field address dari user
       address: order.user?.address || null,
+      deliveryTime: order.deliveryTime || null,
       totalAmount: order.totalAmount ? order.totalAmount.toString() : "0",
-      createdAt: order.createdAt, 
+      createdAt: order.createdAt,
       paymentUrl: order.payment?.paymentUrl || null,
       
       user: {
-        id: order.user?.id || "", 
+        id: order.user?.id || "",
         fullName: order.user?.name || order.user?.fullName || "Pelanggan (Tanpa Nama)",
         email: order.user?.email || "-",
         phoneNumber: order.user?.phoneNumber || "-",
@@ -57,22 +56,48 @@ export async function GET(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const body = await request.json();
-    const { orderId, status } = body;
+    const { orderId, status, address, deliveryTime } = body;
 
-    const updatedOrder = await prisma.order.update({
+    const order = await prisma.order.findUnique({
       where: { id: orderId },
-      data: { status: status },
+      select: { userId: true },
     });
 
-    await pusherServer.trigger(`order-updates-${updatedOrder.userId}`, 'status-update', {
-      orderId: updatedOrder.id,
-      status: updatedOrder.status,
-      message: `Status pesanan Anda telah diupdate ke ${updatedOrder.status}`,
+    if (!order) {
+      return NextResponse.json({ message: "Pesanan tidak ditemukan" }, { status: 404 });
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      if (address !== undefined) {
+        await tx.user.update({
+          where: { id: order.userId },
+          data: { address: address },
+        });
+      }
+
+      const updateData: any = {};
+      if (status) updateData.status = status;
+      if (deliveryTime !== undefined) updateData.deliveryTime = deliveryTime;
+
+      const updatedOrder = await tx.order.update({
+        where: { id: orderId },
+        data: updateData,
+      });
+
+      return updatedOrder;
     });
 
-    return NextResponse.json(updatedOrder);
+    if (status) {
+      await pusherServer.trigger(`order-updates-${order.userId}`, 'status-update', {
+        orderId: result.id,
+        status: result.status,
+        message: `Status pesanan Anda telah diupdate ke ${result.status}`,
+      });
+    }
+
+    return NextResponse.json(result);
   } catch (error) {
     console.error("🔥 ERROR PATCH ORDER:", error);
-    return NextResponse.json({ message: "Gagal update status" }, { status: 500 });
+    return NextResponse.json({ message: "Gagal update order" }, { status: 500 });
   }
 }

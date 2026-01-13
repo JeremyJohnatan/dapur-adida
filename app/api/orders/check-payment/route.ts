@@ -12,7 +12,6 @@ export async function POST(request: Request) {
 
     const { orderId } = await request.json();
 
-    // 1. Ambil data payment dari database
     const payment = await prisma.payment.findFirst({
       where: { orderId: orderId },
     });
@@ -24,7 +23,7 @@ export async function POST(request: Request) {
     console.log(`Checking Invoice ID: ${payment.xenditInvoiceId}`);
     
     const invoice = await xenditClient.Invoice.getInvoiceById({
-      invoiceId: payment.xenditInvoiceId // Perhatikan: 'invoiceId' (kecil), bukan 'invoiceID'
+      invoiceId: payment.xenditInvoiceId
     });
 
     console.log(`Status: ${invoice.status}`);
@@ -33,34 +32,28 @@ export async function POST(request: Request) {
     const currentStatus = invoice.status.toUpperCase();
 
     if (currentStatus === "PAID" || currentStatus === "SETTLED") {
-      // Transaction untuk update order, payment, dan kurangi stock
       await prisma.$transaction(async (tx) => {
-        // Update Order jadi PROCESSING
         await tx.order.update({
           where: { id: orderId },
           data: { status: "PROCESSING" }
         });
 
-        // Update Payment jadi PAID
         await tx.payment.update({
           where: { id: payment.id },
           data: { status: "PAID", paidAt: new Date() }
         });
 
-        // Ambil order items untuk kurangi stock
         const orderItems = await tx.orderItem.findMany({
           where: { orderId: orderId },
           include: { menu: true }
         });
 
-        // Kurangi stock untuk setiap menu
         for (const item of orderItems) {
           await tx.menu.update({
             where: { id: item.menuId },
             data: { stock: { decrement: item.quantity } }
           });
 
-          // Trigger Pusher untuk stock update realtime
           await pusherServer.trigger("stock-updates", "stock-changed", {
             menuId: item.menuId,
             menuName: item.menu?.name,

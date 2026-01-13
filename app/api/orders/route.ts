@@ -31,9 +31,9 @@ export async function POST(request: Request) {
 
     const body = await request.json();
 
-    const { items, totalPrice, note } = body;
+    const { items, totalPrice, note, deliveryTime } = body;
 
-    console.log("ORDER DATA MASUK:", { user: session.user.name, total: totalPrice, note: note });
+    console.log("ORDER DATA MASUK:", { user: session.user.name, total: totalPrice, note: note, deliveryTime: deliveryTime });
 
     if (!items || items.length === 0) return NextResponse.json({ message: "Keranjang kosong" }, { status: 400 });
 
@@ -53,12 +53,21 @@ export async function POST(request: Request) {
     const BASE_URL = process.env.NEXTAUTH_URL || "http://localhost:3000";
 
     const result = await prisma.$transaction(async (tx) => {
+      // Update user address if provided
+      if (address) {
+        await tx.user.update({
+          where: { id: session?.user?.id },
+          data: { address: address },
+        });
+      }
+
       const order = await tx.order.create({
         data: {
           userId: session?.user?.id,
           totalAmount: amountNumber,
           status: "PENDING",
-          note: note ? note : null, 
+          note: note ? note : null,
+          deliveryTime: deliveryTime ? deliveryTime : null, 
         },
       });
 

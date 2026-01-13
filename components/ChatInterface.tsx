@@ -36,7 +36,6 @@ export default function ChatInterface() {
     return <div className="flex justify-center items-center h-screen"><Loader2 className="animate-spin" /></div>;
   }
 
-  // TAMPILKAN UI BERDASARKAN ROLE
   if (session?.user?.role === "ADMIN") {
     return <AdminChatView session={session} />;
   }
@@ -55,7 +54,6 @@ function AdminChatView({ session }: { session: any }) {
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // A. Cek URL jika ada direct chat dari halaman Orders
   useEffect(() => {
     const userIdFromUrl = searchParams.get("userId");
     if (userIdFromUrl) {
@@ -63,7 +61,6 @@ function AdminChatView({ session }: { session: any }) {
     }
   }, [searchParams]);
 
-  // B. Fetch Inbox List (Daftar Orang yang chat)
   useEffect(() => {
     const fetchInbox = async () => {
       try {
@@ -73,7 +70,6 @@ function AdminChatView({ session }: { session: any }) {
     };
     fetchInbox();
 
-    // Pusher: Dengar notifikasi pesan baru masuk (untuk update list inbox)
     const channel = pusherClient.subscribe("admin-channel");
     channel.bind("new-inbox", (data: any) => {
       setInboxList((prev) => {
@@ -83,7 +79,7 @@ function AdminChatView({ session }: { session: any }) {
           name: data.name, 
           lastMessage: data.lastMessage, 
           lastTime: data.lastTime, 
-          unread: true // Tandai belum dibaca jika sedang tidak dibuka
+          unread: true
         }, ...filtered];
       });
     });
@@ -94,7 +90,6 @@ function AdminChatView({ session }: { session: any }) {
     };
   }, []);
 
-  // C. Fetch Detail Chat saat user diklik
   useEffect(() => {
     if (!selectedPartnerId) return;
 
@@ -109,7 +104,6 @@ function AdminChatView({ session }: { session: any }) {
     };
     fetchRoom();
 
-    // Pusher: Dengar chat spesifik user yang sedang dibuka
     const channelName = `chat-${selectedPartnerId}`;
     const channel = pusherClient.subscribe(channelName);
     
@@ -118,7 +112,6 @@ function AdminChatView({ session }: { session: any }) {
         if (prev.some(msg => msg.id === newChat.id)) return prev;
         return [...prev, newChat];
       });
-      // Scroll ke bawah
       setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
     });
 
@@ -128,17 +121,15 @@ function AdminChatView({ session }: { session: any }) {
     };
   }, [selectedPartnerId]);
 
-  // Auto scroll saat pesan berubah
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
   }, [messages]);
 
-  // D. Kirim Pesan Admin
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !selectedPartnerId) return;
     
     const tempMessage = newMessage;
-    setNewMessage(""); // Reset input UI dulu biar cepat
+    setNewMessage("");
 
     try {
       await fetch("/api/chat", {
@@ -147,7 +138,7 @@ function AdminChatView({ session }: { session: any }) {
         body: JSON.stringify({ message: tempMessage, targetUserId: selectedPartnerId }),
       });
     } catch (error) {
-      setNewMessage(tempMessage); // Balikin teks kalau gagal
+      setNewMessage(tempMessage);
       alert("Gagal mengirim pesan");
     }
   };
@@ -276,7 +267,6 @@ function CustomerChatView({ session }: { session: any }) {
   const [sendingMessage, setSendingMessage] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // A. Fetch Pesan Sendiri
   useEffect(() => {
     const fetchMessages = async () => {
       try {
@@ -288,7 +278,6 @@ function CustomerChatView({ session }: { session: any }) {
     };
     fetchMessages();
 
-    // Pusher: Dengar pesan di channel sendiri
     if (session?.user?.id) {
         const channelName = `chat-${session.user.id}`;
         const channel = pusherClient.subscribe(channelName);
@@ -309,12 +298,10 @@ function CustomerChatView({ session }: { session: any }) {
     }
   }, [session]);
 
-  // Scroll otomatis
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
   }, [messages]);
 
-  // B. Kirim Pesan Customer
   const handleSendMessage = async () => {
     if (!newMessage.trim() || sendingMessage) return;
     const tempMessage = newMessage;
@@ -325,7 +312,7 @@ function CustomerChatView({ session }: { session: any }) {
       await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: tempMessage }), // Customer tidak perlu kirim targetUserId
+        body: JSON.stringify({ message: tempMessage }),
       });
     } catch (error) {
       setNewMessage(tempMessage);
