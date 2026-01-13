@@ -277,7 +277,7 @@ export default function AdminMenuPage() {
                 )}
                 
                 {/* BUTTON ACTIONS */}
-                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="absolute top-2 right-2 flex gap-1">
                   <Button size="icon" variant="secondary" className="h-8 w-8 bg-white/90 hover:bg-white" onClick={() => handleEdit(menu)}>
                     <Pencil className="h-4 w-4 text-blue-600" />
                   </Button>
@@ -296,8 +296,8 @@ export default function AdminMenuPage() {
                 </button>
 
                 {(!menu.isAvailable || menu.stock <= 0) && (
-                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center pointer-events-none">
-                    <Badge variant="destructive" className="text-lg px-6 py-2 font-bold uppercase tracking-widest shadow-lg">
+                  <div className="absolute inset-0 bg-black/10 flex items-center justify-center pointer-events-none">
+                    <Badge className="text-base px-6 py-3 font-bold uppercase tracking-widest shadow-xl bg-red-500 hover:bg-red-600 border-2 border-red-700">
                       {menu.stock <= 0 ? "Stok Habis" : "Tidak Tersedia"}
                     </Badge>
                   </div>

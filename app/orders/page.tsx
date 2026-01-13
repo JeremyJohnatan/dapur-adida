@@ -185,6 +185,29 @@ export default function OrderHistoryPage() {
     }
   };
 
+  const handleCancelOrder = async (orderId: string) => {
+    if (!confirm("Apakah Anda yakin ingin membatalkan pesanan ini?")) return;
+
+    try {
+      const res = await fetch("/api/orders/cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        alert("✅ Pesanan berhasil dibatalkan.");
+        fetchOrders();
+      } else {
+        alert(data.message || "Gagal membatalkan pesanan.");
+      }
+    } catch (error) {
+      alert("Terjadi kesalahan saat membatalkan pesanan.");
+    }
+  };
+
   const handleReviewSubmit = async () => {
     if (!selectedItem) return;
     setSubmittingReview(true);
@@ -403,7 +426,6 @@ export default function OrderHistoryPage() {
                       </Button>
                     </Link>
 
-                    {/* TOMBOL Cek Status & Bayar (Hanya Muncul Jika PENDING) */}
                     {order.status === "PENDING" && order.payment?.paymentUrl && (
                       <>
                         <Button 
@@ -422,6 +444,15 @@ export default function OrderHistoryPage() {
                              <CreditCard className="h-3 w-3 mr-2" /> Bayar Sekarang
                           </Button>
                         </a>
+
+                        <Button 
+                          size="sm" 
+                          variant="destructive"
+                          onClick={() => handleCancelOrder(order.id)}
+                          className="text-xs h-8 bg-red-500 hover:bg-red-600 text-white"
+                        >
+                          Batalkan
+                        </Button>
                       </>
                     )}
                   </div>

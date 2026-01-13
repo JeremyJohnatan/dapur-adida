@@ -273,6 +273,7 @@ function CustomerChatView({ session }: { session: any }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(true);
+  const [sendingMessage, setSendingMessage] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // A. Fetch Pesan Sendiri
@@ -297,6 +298,7 @@ function CustomerChatView({ session }: { session: any }) {
             if (prev.some(msg => msg.id === newChat.id)) return prev;
             return [...prev, newChat];
           });
+          setSendingMessage(false);
           setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
         });
 
@@ -314,9 +316,10 @@ function CustomerChatView({ session }: { session: any }) {
 
   // B. Kirim Pesan Customer
   const handleSendMessage = async () => {
-    if (!newMessage.trim()) return;
+    if (!newMessage.trim() || sendingMessage) return;
     const tempMessage = newMessage;
-    setNewMessage(""); 
+    setNewMessage("");
+    setSendingMessage(true);
 
     try {
       await fetch("/api/chat", {
@@ -327,6 +330,8 @@ function CustomerChatView({ session }: { session: any }) {
     } catch (error) {
       setNewMessage(tempMessage);
       alert("Gagal kirim pesan");
+    } finally {
+      setSendingMessage(false);
     }
   };
 
@@ -377,12 +382,13 @@ function CustomerChatView({ session }: { session: any }) {
               onChange={(e) => setNewMessage(e.target.value)}
               onKeyDown={(e) => { if(e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
               placeholder="Tulis pesan..." 
-              className="flex-1 rounded-2xl bg-slate-100 border-none p-3 text-sm focus:outline-none focus:ring-1 focus:ring-primary resize-none scrollbar-hide"
+              disabled={sendingMessage}
+              className="flex-1 rounded-2xl bg-slate-100 border-none p-3 text-sm focus:outline-none focus:ring-1 focus:ring-primary resize-none scrollbar-hide disabled:opacity-50"
               rows={1}
               style={{ minHeight: "44px", maxHeight: "120px" }}
             />
-            <Button onClick={handleSendMessage} size="icon" className="rounded-full bg-primary hover:bg-primary/90 shrink-0 h-11 w-11 mb-[1px]">
-              <Send className="h-5 w-5" />
+            <Button onClick={handleSendMessage} disabled={sendingMessage} size="icon" className="rounded-full bg-primary hover:bg-primary/90 shrink-0 h-11 w-11 mb-[1px] disabled:opacity-60">
+              {sendingMessage ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
             </Button>
           </div>
         </div>
