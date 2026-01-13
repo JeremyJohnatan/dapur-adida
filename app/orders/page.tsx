@@ -89,7 +89,6 @@ export default function OrderHistoryPage() {
   const [loading, setLoading] = useState(true);
   const [checkingId, setCheckingId] = useState<string | null>(null);
 
-  // Cek apakah user adalah admin
   const isAdmin = session?.user?.role === "ADMIN";
 
   // State untuk Review Modal
@@ -99,12 +98,10 @@ export default function OrderHistoryPage() {
   const [reviewComment, setReviewComment] = useState("");
   const [submittingReview, setSubmittingReview] = useState(false);
 
-  // Cek Login
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
   }, [status, router]);
 
-  // --- FUNGSI FETCH DATA ---
   const fetchOrders = useCallback(async () => {
     if (session?.user) {
       try {
@@ -125,7 +122,6 @@ export default function OrderHistoryPage() {
     fetchOrders();
   }, [fetchOrders]);
 
-  // Subscribe ke Pusher untuk notifikasi real-time
   useEffect(() => {
     if (session?.user?.id) {
       const channel = pusherClient.subscribe(`order-updates-${session.user.id}`);
@@ -164,7 +160,6 @@ export default function OrderHistoryPage() {
     }
   }, [session]);
 
-  // --- FUNGSI CEK STATUS ---
   const handleCheckPayment = async (orderId: string, manual: boolean = true) => {
     if (manual) setCheckingId(orderId); 
 
@@ -190,7 +185,6 @@ export default function OrderHistoryPage() {
     }
   };
 
-  // --- FUNGSI REVIEW ---
   const handleReviewSubmit = async () => {
     if (!selectedItem) return;
     setSubmittingReview(true);

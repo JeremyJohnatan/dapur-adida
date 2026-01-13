@@ -4,7 +4,6 @@ import { pusherServer } from "@/lib/pusher";
 
 export const dynamic = "force-dynamic"; 
 
-// --- GET: AMBIL SEMUA PESANAN ---
 export async function GET(request: Request) {
   try {
     const orders = await prisma.order.findMany({
@@ -55,7 +54,6 @@ export async function GET(request: Request) {
   }
 }
 
-// --- PATCH: UPDATE STATUS PESANAN ---
 export async function PATCH(request: Request) {
   try {
     const body = await request.json();

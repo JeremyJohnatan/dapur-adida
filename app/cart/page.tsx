@@ -44,10 +44,8 @@ export default function CartPage() {
   const [isLoadingAddress, setIsLoadingAddress] = useState(true);
   const [animatingId, setAnimatingId] = useState<string | null>(null);
 
-  // Cek apakah user adalah admin
   const isAdmin = session?.user?.role === "ADMIN";
 
-  // Fetch alamat user saat halaman load
   useEffect(() => {
     const fetchUserAddress = async () => {
       if (!session) {

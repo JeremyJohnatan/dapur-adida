@@ -25,15 +25,9 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // --- STATE TANGGAL ---
-  const todayStr = new Date().toISOString().split('T')[0];
-  // Mundur 7 hari
-  const last7DaysStr = new Date(new Date().setDate(new Date().getDate() - 6)).toISOString().split('T')[0];
-
   const [startDate, setStartDate] = useState(last7DaysStr);
   const [endDate, setEndDate] = useState(todayStr);
 
-  // Fungsi Fetch Data
   const fetchStats = async (start: string, end: string) => {
     setErrorMsg(null); 
     setLoading(true);

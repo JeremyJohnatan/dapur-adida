@@ -33,7 +33,6 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-// Definisikan tipe data Menu
 interface Menu {
   id: string;
   name: string;
@@ -49,22 +48,16 @@ export default function MenuPage() {
   const [menus, setMenus] = useState<Menu[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // State untuk menyimpan data review per menu
   const [reviews, setReviews] = useState<Record<string, any[]>>({});
-  // State untuk toggle tampil/sembunyi review per menu
-  const [showReviews, setShowReviews] = useState<Record<string, boolean>>({});
+  const [showReviews, setShowReviews] = useState<Record<string, boolean>>({});;
   
   const { addToCart, totalItems } = useCart();
   const { data: session } = useSession();
 
-  // Cek apakah user adalah admin
   const isAdmin = session?.user?.role === "ADMIN"; 
 
-  // --- STATE ANIMASI & NOTIFIKASI ---
   const [isCartBumping, setIsCartBumping] = useState(false);
   const [addedItems, setAddedItems] = useState<Record<string, boolean>>({});
-  
-  // State untuk Pop-up Notifikasi
   const [toast, setToast] = useState<{ show: boolean; message: string } | null>(null);
 
   useEffect(() => {
@@ -95,7 +88,6 @@ export default function MenuPage() {
 
     fetchMenus();
 
-    // --- PUSHER LISTENER UNTUK REAL-TIME STOCK UPDATE ---
     const stockChannel = pusherClient.subscribe("stock-updates");
     stockChannel.bind("stock-changed", (data: any) => {
       setMenus((prevMenus) =>

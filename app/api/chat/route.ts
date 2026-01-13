@@ -6,7 +6,6 @@ import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 
 
-// GET: Ambil riwayat chat
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const mode = searchParams.get("mode");
@@ -76,7 +75,6 @@ export async function GET(request: Request) {
   }
 }
 
-// POST: Kirim Pesan
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -98,16 +96,11 @@ export async function POST(request: Request) {
       receiverId = admin ? admin.id : senderId;
     }
 
-    // Simpan Database
     const newChat = await prisma.chat.create({
       data: { message, senderId, receiverId, isRead: false },
       include: { sender: { select: { fullName: true } } }
     });
 
-    // --- LOGIKA CHANNEL NAME (PENTING!) ---
-    // Channel selalu menggunakan ID Customer.
-    // Jika Admin kirim ke Budi -> Channel: chat-ID_BUDI
-    // Jika Budi kirim ke Admin -> Channel: chat-ID_BUDI
     const customerId = senderRole === "ADMIN" ? receiverId : senderId;
     const channelName = `chat-${customerId}`;
 

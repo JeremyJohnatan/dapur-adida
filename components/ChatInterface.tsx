@@ -8,7 +8,6 @@ import { Send, ChefHat, ArrowLeft, Loader2, MessageSquare, Search, User } from "
 import Link from "next/link";
 import { pusherClient } from "@/lib/pusher";
 
-// --- TIPE DATA ---
 interface ChatMessage {
   id: string;
   message: string;
@@ -25,9 +24,6 @@ interface InboxItem {
   unread?: boolean;
 }
 
-// ==================================================================================
-// 1. KOMPONEN UTAMA (CONTROLLER)
-// ==================================================================================
 export default function ChatInterface() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -48,9 +44,6 @@ export default function ChatInterface() {
   return <CustomerChatView session={session} />;
 }
 
-// ==================================================================================
-// 2. VIEW KHUSUS ADMIN
-// ==================================================================================
 function AdminChatView({ session }: { session: any }) {
   const searchParams = useSearchParams();
   
@@ -276,9 +269,6 @@ function AdminChatView({ session }: { session: any }) {
   );
 }
 
-// ==================================================================================
-// 3. VIEW KHUSUS CUSTOMER
-// ==================================================================================
 function CustomerChatView({ session }: { session: any }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState("");

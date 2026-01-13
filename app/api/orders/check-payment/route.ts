@@ -21,16 +21,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Invoice tidak ditemukan" }, { status: 404 });
     }
 
-    // 2. Tanya ke Xendit (FIXED: Pakai getInvoiceById)
-    console.log(`🔍 Mengecek Invoice ID: ${payment.xenditInvoiceId}`);
+    console.log(`Checking Invoice ID: ${payment.xenditInvoiceId}`);
     
     const invoice = await xenditClient.Invoice.getInvoiceById({
       invoiceId: payment.xenditInvoiceId // Perhatikan: 'invoiceId' (kecil), bukan 'invoiceID'
     });
 
-    // --- DEBUGGING ---
-    console.log(`🧾 STATUS: ${invoice.status}`);
-    // -----------------
+    console.log(`Status: ${invoice.status}`);
 
     // 3. Cek Status & Update Database
     const currentStatus = invoice.status.toUpperCase();

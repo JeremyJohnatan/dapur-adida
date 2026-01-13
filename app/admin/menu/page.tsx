@@ -16,7 +16,6 @@ import { pusherClient } from "@/lib/pusher";
 const CLOUDINARY_CLOUD_NAME = "dvntlphzd"; 
 const CLOUDINARY_UPLOAD_PRESET = "dapur-adida-preset"; 
 
-// Tipe Data Menu
 interface Menu {
   id: string;
   name: string;
@@ -55,7 +54,6 @@ export default function AdminMenuPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  // --- FETCH DATA ---
   const fetchMenus = async () => {
     try {
       const res = await fetch("/api/admin/menu"); // Pastikan endpoint GET menampilkan semua data
@@ -70,7 +68,6 @@ export default function AdminMenuPage() {
   useEffect(() => {
     fetchMenus();
 
-    // --- PUSHER LISTENER UNTUK REAL-TIME STOCK UPDATE ---
     const stockChannel = pusherClient.subscribe("stock-updates");
     stockChannel.bind("stock-changed", (data: any) => {
       setMenus((prevMenus) =>
@@ -88,7 +85,6 @@ export default function AdminMenuPage() {
     };
   }, []);
 
-  // --- HANDLER UPLOAD GAMBAR ---
   const handleImageUpload = async (file: File): Promise<string | null> => {
     setIsUploading(true);
     const formData = new FormData();

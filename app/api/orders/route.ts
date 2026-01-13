@@ -8,7 +8,6 @@ import { authOptions } from "@/lib/auth";
 const apiKey = process.env.XENDIT_SECRET_KEY;
 const xenditClient = new Xendit({ secretKey: apiKey || "" });
 
-// --- GET ---
 export async function GET(request: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -25,7 +24,6 @@ export async function GET(request: Request) {
   }
 }
 
-// --- POST ---
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -33,11 +31,9 @@ export async function POST(request: Request) {
 
     const body = await request.json();
 
-    // 🔥 PERBAIKAN 1: Ambil 'note' dari body request
     const { items, totalPrice, note } = body;
 
-    // Debugging (Opsional: Cek di terminal server)
-    console.log("🔥 ORDER DATA MASUK:", { user: session.user.name, total: totalPrice, note: note });
+    console.log("ORDER DATA MASUK:", { user: session.user.name, total: totalPrice, note: note });
 
     if (!items || items.length === 0) return NextResponse.json({ message: "Keranjang kosong" }, { status: 400 });
 
@@ -62,7 +58,6 @@ export async function POST(request: Request) {
           userId: session?.user?.id,
           totalAmount: amountNumber,
           status: "PENDING",
-          // 🔥 PERBAIKAN 2: Simpan 'note' ke database
           note: note ? note : null, 
         },
       });
